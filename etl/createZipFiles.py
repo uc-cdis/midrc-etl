@@ -2,8 +2,8 @@ from io import BytesIO
 import  zipfile, boto3
 AWS_ACCESS_KEY_ID = ""
 AWS_ACCESS_SECRET_ACCESS_KEY = ""
-AWS_STORAGE_BUCKET_NAME = "qaplanetv2-qa-midrc-707767160287-upload"
-folder = "05539ef4-137e-47c4-a807-a7be0eb9ec40/test"
+AWS_STORAGE_BUCKET_NAME = ""
+folder = ""
 aws_session = boto3.Session(aws_access_key_id = AWS_ACCESS_KEY_ID,
                    aws_secret_access_key = AWS_ACCESS_SECRET_ACCESS_KEY)
 

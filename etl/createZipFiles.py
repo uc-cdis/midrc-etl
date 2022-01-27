@@ -37,12 +37,12 @@ def getPackagemd5(package_name):
         pass
     return md5sum
 
-# def getPackageUrl(package_name):
-#     return "s3://"+AWS_STORAGE_BUCKET_NAME+"/"+package_name
+def getPackageUrl(package_name):
+    return "s3://"+AWS_STORAGE_BUCKET_NAME+"/"+package_name
 
 
 # opens a folder in s3 and package its contents into zip file
-def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=True):
+def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=False):
     response = {} 
     bucket = s3_resource.Bucket(bucketName)
     filesCollection = bucket.objects.filter(Prefix=bucketFilePath).all() 
@@ -59,11 +59,11 @@ def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=T
     package_name = bucketFilePath + "/" + jobKey + ".zip"
     archive.close()
 
-    response['fileUrl'] = None
-    if createUrl is True:
-        s3Client = boto3.client('s3')
-        response['fileUrl'] = s3Client.generate_presigned_url('get_object', Params={'Bucket': bucketName,
-                                                            'Key': '' + bucketFilePath + '/' + jobKey + '.zip'}, ExpiresIn=3600)
-    return package_name, response['fileUrl']
+    # response['fileUrl'] = None
+    # if createUrl is True:
+    #     s3Client = boto3.client('s3')
+    #     response['fileUrl'] = s3Client.generate_presigned_url('get_object', Params={'Bucket': bucketName,
+    #                                                         'Key': '' + bucketFilePath + '/' + jobKey + '.zip'}, ExpiresIn=3600)
+    return package_name
 
 

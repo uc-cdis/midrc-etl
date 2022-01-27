@@ -54,11 +54,11 @@ def create_outputtsv():
         if("A1" in project_id):
             authz = "/programs/Open/projects/A1"
         s3_bucket, folder_path = split_s3_path(storage_url)
-        package_name, zip_url = packaging.createZipFileStream(s3_bucket, folder_path, group_key, "dcm")
-        zip_size = packaging.getPackageSize(package_name)
-        zip_md5 = packaging.getPackagemd5(package_name)
-
-        writer.writerow(["package"+"    "+(zip_md5)+"   "+(zip_size)+"  "+(authz)+" "+(zip_url)+"   "+case_id+"/"+study_id+"/"+group_key+".zip"
+        package_name = packaging.createZipFileStream(s3_bucket, folder_path, group_key, "dcm")
+        package_size = packaging.getPackageSize(package_name)
+        package_md5 = packaging.getPackagemd5(package_name)
+        package_url = packaging.getPackageUrl(package_name)
+        writer.writerow(["package"+"    "+(package_md5)+"   "+(package_size)+"  "+(authz)+" "+(package_url)+"   "+case_id+"/"+study_id+"/"+group_key+".zip"
                             +"  "+str(package_contents(group_value))])
  
 create_outputtsv()

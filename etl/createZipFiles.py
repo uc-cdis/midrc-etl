@@ -1,9 +1,15 @@
 from io import BytesIO
 import  zipfile, boto3
-AWS_ACCESS_KEY_ID = "AKIAJPNBVVE3SUVO3SAA"
-AWS_ACCESS_SECRET_ACCESS_KEY = "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"
-AWS_STORAGE_BUCKET_NAME = "qaplanetv2-qa-midrc-707767160287-upload"
-folder = "05539ef4-137e-47c4-a807-a7be0eb9ec40/test"
+import botocore
+import yaml
+with open("config.yml", "r") as ymlfile:
+    cfg = yaml.load(ymlfile)
+
+AWS_ACCESS_KEY_ID = cfg[1]["aws"]["access_key"]
+AWS_ACCESS_SECRET_ACCESS_KEY = cfg[1]["aws"]["secret_key"]
+AWS_STORAGE_BUCKET_NAME = ""
+
+folder = ""
 aws_session = boto3.Session(aws_access_key_id = AWS_ACCESS_KEY_ID,
                    aws_secret_access_key = AWS_ACCESS_SECRET_ACCESS_KEY)
 
@@ -12,9 +18,34 @@ s3 = aws_session.resource("s3")
 
 
 
-s3 = boto3.client("s3", region_name = "us-east-1")
+s3 = boto3.client("s3", region_name = "")
 s3_resource = boto3.resource("s3", aws_access_key_id=AWS_ACCESS_KEY_ID,
          aws_secret_access_key= AWS_ACCESS_SECRET_ACCESS_KEY)
+
+def getPackageSize(package_name):
+    try:
+        package = boto3.resource("s3").Object(AWS_STORAGE_BUCKET_NAME,package_name)
+        package_size = package.content_length
+    except botocore.exceptions.ClientError:
+        package_size = None
+        pass
+    return package_size
+
+def getPackagemd5(package_name):
+    try:
+        md5sum = boto3.client('s3').head_object(
+            Bucket=AWS_STORAGE_BUCKET_NAME,
+            Key=package_name
+        )['ETag'][1:-1]
+    except botocore.exceptions.ClientError:
+        md5sum = None
+        pass
+    return md5sum
+
+def getPackageUrl(package_name):
+    return "s3://"+AWS_STORAGE_BUCKET_NAME+"/"+package_name
+
+
 
 def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=False):
     response = {} 
@@ -24,12 +55,13 @@ def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=F
 
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as zip_archive:
         for file in filesCollection:
-            #if file.key.endswith('.' + fileExt):   
+            if file.key.endswith('.' + fileExt):   
                 with zip_archive.open(file.key, 'w') as file1:
                     file1.write(file.get()['Body'].read())  
 
     archive.seek(0)
-    s3_resource.Object(bucketName, bucketFilePath + '/' + jobKey + '.zip').upload_fileobj(archive)
+    s3_resource.Object(bucketName, bucketFilePath + "/" + jobKey + ".zip").upload_fileobj(archive)
+    package_name = bucketFilePath + "/" + jobKey + ".zip"
     archive.close()
 
     response['fileUrl'] = None
@@ -41,6 +73,6 @@ def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=F
                                                               ExpiresIn=3600)
 
     
+    return package_name
 
-
-createZipFileStream(AWS_STORAGE_BUCKET_NAME,folder,"test",".dcm")
+createZipFileStream(AWS_STORAGE_BUCKET_NAME,folder,"test","dcm")

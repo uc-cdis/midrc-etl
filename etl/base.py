@@ -19,6 +19,11 @@ df = pd.read_csv(cfg["manifest"]["file_name"], sep='\t',
 grouped = df.groupby(cfg["manifest"]["package_attribute"])
 output_file = "output/output.tsv"
 
+# create output file to store package contents 
+with open(output_file, 'w') as tsvfile:
+    writer = csv.writer(tsvfile, delimiter="\t", lineterminator="\n")
+    writer.writerow(["record_type"+"    "+"md5"+"   "+"size"+"  "+"authz"+" "+"url"+"   "+"file_name"+" "+"package_contents"])
+
 # parse s3 url to get bucket name and file path
 def split_s3_path(s3_path):
     path_parts = s3_path.replace("s3://","").split("/")
@@ -39,14 +44,11 @@ def package_contents(group_dataframe):
     return package_contents
 
 # to populate output tsv files 
-with open(output_file, 'w') as tsvfile:
-    writer = csv.writer(tsvfile, delimiter="\t", lineterminator="\n")
-    writer.writerow(["record_type"+"    "+"md5"+"   "+"size"+"  "+"authz"+" "+"url"+"   "+"file_name"+" "+"package_contents"])
+def create_outputtsv():
     for group_key,group_value in grouped:
         study_id = df.loc[df["series_uid"] == group_key,"study_uid"].values[0]
         case_id = df.loc[df["series_uid"] == group_key,"case_ids"].values[0]
         storage_url = df.loc[df["series_uid"] == group_key, "storage_urls"].values[0]
-        folder_name = case_id +"/"+ study_id +"/"+ group_key
         project_id = df.loc[df["series_uid"] == group_key, "acl"].values[0]
         authz = "/programs/Open/projects/R1"
         if("A1" in project_id):
@@ -58,8 +60,8 @@ with open(output_file, 'w') as tsvfile:
 
         writer.writerow(["package"+"    "+(zip_md5)+"   "+(zip_size)+"  "+(authz)+" "+(zip_url)+"   "+case_id+"/"+study_id+"/"+group_key+".zip"
                             +"  "+str(package_contents(group_value))])
-    
-
+ 
+create_outputtsv()
  
    
       

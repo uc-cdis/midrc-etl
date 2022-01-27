@@ -9,15 +9,10 @@ AWS_ACCESS_KEY_ID = cfg["aws"]["access_key"]
 AWS_ACCESS_SECRET_ACCESS_KEY = cfg["aws"]["secret_key"]
 AWS_STORAGE_BUCKET_NAME = cfg["aws"]["bucket"]
 
-
 aws_session = boto3.Session(aws_access_key_id = AWS_ACCESS_KEY_ID,
                    aws_secret_access_key = AWS_ACCESS_SECRET_ACCESS_KEY)
 
 s3 = aws_session.resource("s3")
-
-
-
-
 s3 = boto3.client("s3", region_name = "us-east-1")
 s3_resource = boto3.resource("s3", aws_access_key_id=AWS_ACCESS_KEY_ID,
          aws_secret_access_key= AWS_ACCESS_SECRET_ACCESS_KEY)
@@ -29,7 +24,6 @@ def getPackageSize(package_name):
     except botocore.exceptions.ClientError:
         package_size = None
         pass
-    print("package size is: "+package_size)
     return package_size
 
 def getPackagemd5(package_name):
@@ -41,15 +35,14 @@ def getPackagemd5(package_name):
     except botocore.exceptions.ClientError:
         md5sum = None
         pass
-    print("md5sum is: "+md5sum)
     return md5sum
 
 # def getPackageUrl(package_name):
 #     return "s3://"+AWS_STORAGE_BUCKET_NAME+"/"+package_name
 
 
-
-def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=False):
+# opens a folder in s3 and package its contents into zip file
+def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=True):
     response = {} 
     bucket = s3_resource.Bucket(bucketName)
     filesCollection = bucket.objects.filter(Prefix=bucketFilePath).all() 
@@ -67,14 +60,10 @@ def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=F
     archive.close()
 
     response['fileUrl'] = None
-
     if createUrl is True:
         s3Client = boto3.client('s3')
         response['fileUrl'] = s3Client.generate_presigned_url('get_object', Params={'Bucket': bucketName,
-                                                                                    'Key': '' + bucketFilePath + '/' + jobKey + '.zip'},
-                                                              ExpiresIn=3600)
-
-    
+                                                            'Key': '' + bucketFilePath + '/' + jobKey + '.zip'}, ExpiresIn=3600)
     return package_name, response['fileUrl']
 
 

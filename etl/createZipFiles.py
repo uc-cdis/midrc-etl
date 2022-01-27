@@ -42,8 +42,8 @@ def getPackagemd5(package_name):
         pass
     return md5sum
 
-def getPackageUrl(package_name):
-    return "s3://"+AWS_STORAGE_BUCKET_NAME+"/"+package_name
+# def getPackageUrl(package_name):
+#     return "s3://"+AWS_STORAGE_BUCKET_NAME+"/"+package_name
 
 
 
@@ -73,6 +73,6 @@ def createZipFileStream(bucketName, bucketFilePath, jobKey, fileExt, createUrl=F
                                                               ExpiresIn=3600)
 
     
-    return package_name
+    return package_name, response['fileUrl']
 
 createZipFileStream(AWS_STORAGE_BUCKET_NAME,folder,"test","dcm")

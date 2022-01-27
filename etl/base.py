@@ -4,10 +4,10 @@ import csv
 import yaml
 import createZipFiles as packaging
 
-with open("config.yml", "r") as ymlfile:
-    cfg = yaml.load(ymlfile)
+with open("config.yml", "rt", encoding='utf8') as ymlfile:
+    cfg = yaml.safe_load(ymlfile)
 
-df = pd.read_csv(cfg[0]["manifest"]["file_name"], sep='\t', 
+df = pd.read_csv(cfg["manifest"]["file_name"], sep='\t', 
                       
                       header = 0,
                       index_col=1,
@@ -16,14 +16,15 @@ df = pd.read_csv(cfg[0]["manifest"]["file_name"], sep='\t',
                       #dtype = {"file_name":str,"file_size":str,"md5sum":str,"acl":str,"storage_urls":object,"series_uid":str,"study_uid":str,"case_ids":str}
                       )
 # determines which attribute is used for packaging 
-grouped = df.groupby(cfg[0]["manifest"]["package_attribute"])
+grouped = df.groupby(cfg["manifest"]["package_attribute"])
 output_file = "output/output.tsv"
 
 # parse s3 url to get bucket name and file path
 def split_s3_path(s3_path):
-    path_parts=s3_path.replace("s3://","").split("/")
-    bucket=path_parts.pop(0)
-    key="/".join(path_parts)
+    path_parts = s3_path.replace("s3://","").split("/")
+    bucket = path_parts.pop(0)
+    file_name = path_parts.pop(len(path_parts) - 1) # remove file_name from url so the whole series_uid folder can be packaged 
+    key = "/".join(path_parts)
     return bucket, key
 
 # to populate package_contents section in the output. package_contents contains details about individual files( like, size, md5sum and file_name)
@@ -40,7 +41,7 @@ def package_contents(group_dataframe):
 # to populate output tsv files 
 with open(output_file, 'w') as tsvfile:
     writer = csv.writer(tsvfile, delimiter="\t", lineterminator="\n")
-    writer.writerow(["record_type"+"    "+"md5"+"    "+"size"+"    "+"authz"+"    "+"url"+"    "+"file_name"+"    "+"package_contents"])
+    writer.writerow(["record_type"+"    "+"md5"+"   "+"size"+"  "+"authz"+" "+"url"+"   "+"file_name"+" "+"package_contents"])
     for group_key,group_value in grouped:
         study_id = df.loc[df["series_uid"] == group_key,"study_uid"].values[0]
         case_id = df.loc[df["series_uid"] == group_key,"case_ids"].values[0]
@@ -51,12 +52,12 @@ with open(output_file, 'w') as tsvfile:
         if("A1" in project_id):
             authz = "/programs/Open/projects/A1"
         s3_bucket, folder_path = split_s3_path(storage_url)
-        package_name, zip_url = packaging.createZipFileStream(s3_bucket, folder_path, group_key, ".dcm")
+        package_name, zip_url = packaging.createZipFileStream(s3_bucket, folder_path, group_key, "dcm")
         zip_size = packaging.getPackageSize(package_name)
         zip_md5 = packaging.getPackagemd5(package_name)
 
-        writer.writerow(["package"+"    "+(zip_md5)+"    "+(zip_size)+"    "+(authz)+"    "+(zip_url)+"    "+case_id+"/"+study_id+"/"+group_key+".zip"
-                            +"    "+str(package_contents(group_value))])
+        writer.writerow(["package"+"    "+(zip_md5)+"   "+(zip_size)+"  "+(authz)+" "+(zip_url)+"   "+case_id+"/"+study_id+"/"+group_key+".zip"
+                            +"  "+str(package_contents(group_value))])
     
 
  

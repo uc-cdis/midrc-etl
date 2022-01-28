@@ -4,9 +4,27 @@ import yaml
 import createZipFiles as packaging
 from urllib.parse import urlparse
 import os
+import boto3
 
 with open("config.yml", "rt", encoding="utf8") as ymlfile:
     cfg = yaml.safe_load(ymlfile)
+
+AWS_ACCESS_KEY_ID = cfg["aws"]["access_key"]
+AWS_ACCESS_SECRET_ACCESS_KEY = cfg["aws"]["secret_key"]
+AWS_STORAGE_BUCKET_NAME = cfg["aws"]["bucket"]
+
+aws_session = boto3.Session(
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_ACCESS_SECRET_ACCESS_KEY,
+)
+
+s3 = aws_session.resource("s3")
+s3 = boto3.client("s3", region_name="us-east-1")
+s3_resource = boto3.resource(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_ACCESS_SECRET_ACCESS_KEY,
+)
 
 
 def main():

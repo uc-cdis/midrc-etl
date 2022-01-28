@@ -32,7 +32,7 @@ def main():
         cfg["manifest"]["file_name"],
         sep="\t",
         header=0,
-        index_col=1,
+        low_memory=False,
         usecols=[
             "file_name",
             "file_size",
@@ -77,7 +77,7 @@ def split_s3_path(s3_path):
 def package_contents(group_dataframe):
     package_contents = []
     for row_index, row in group_dataframe.iterrows():
-        size = row.get("file_size")
+        size = row["file_size"]
         md5 = row["md5sum"]
         file_name = row["file_name"]
         row_entry = {"hashes": {"md5sum": md5}, "file_name": file_name, "size": size}

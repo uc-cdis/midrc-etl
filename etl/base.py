@@ -8,7 +8,7 @@ import boto3
 import logging
 
 logging.basicConfig(
-    filename="/logs/myapp.log",
+    filename="logs/myapp.log",
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
@@ -113,6 +113,17 @@ def create_outputtsv(df, writer):
             package_size = packaging.getPackageSize(package_path)
             package_md5 = packaging.getPackagemd5(package_path)
             package_url = packaging.getPackageUrl(package_path)
+            writer.writerow(
+                [
+                    "package",
+                    (package_md5),
+                    (package_size),
+                    (authz),
+                    (package_url),
+                    case_id + "/" + study_id + "/" + group_key + ".zip",
+                    str(package_contents(group_value)),
+                ]
+            )
         except Exception as err:
             logger.error(
                 "Error occured while processing the study_uid %s and series_uid %s",
@@ -120,17 +131,6 @@ def create_outputtsv(df, writer):
                 group_key,
             )
             logger.error(err)
-        writer.writerow(
-            [
-                "package",
-                (package_md5),
-                (package_size),
-                (authz),
-                (package_url),
-                case_id + "/" + study_id + "/" + group_key + ".zip",
-                str(package_contents(group_value)),
-            ]
-        )
 
 
 if __name__ == "__main__":

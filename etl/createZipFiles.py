@@ -3,7 +3,7 @@ import zipfile, boto3
 import botocore
 import yaml
 import hashlib
-from base import s3_resource, AWS_STORAGE_BUCKET_NAME
+from base import s3_resource, AWS_STORAGE_BUCKET_NAME, logger
 
 
 with open("config.yml", "rt", encoding="utf8") as ymlfile:
@@ -30,9 +30,11 @@ def getPackagemd5(package_name):
         )
         filehash = hashlib.md5()
         filehash.update(package)
-    except botocore.exceptions.ClientError:
-        package = None
-        pass
+    except botocore.exceptions.ClientError as err:
+        logger.error(
+            "the following occured while processing md5sum for the %s", package_name
+        )
+        logger.error(err)
     return filehash.hexdigest()
 
 

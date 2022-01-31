@@ -34,25 +34,7 @@ def main():
             "case_ids",
         ],
     )
-    # output file to store package output
-    output_file = "output/output.tsv"
-    # create output file to store package contents
-    with open(
-        output_file, "w"
-    ) as tsvfile:  # "w" open file for writing and reading plain text, create a new file if not exists or truncate the file if exists.
-        writer = csv.writer(tsvfile, delimiter="\t", lineterminator="\n")
-        writer.writerow(
-            [
-                "record_type",
-                "md5",
-                "size",
-                "authz",
-                "url",
-                "file_name",
-                "package_contents",
-            ]
-        )
-    create_outputtsv(dataframe, writer)
+    create_outputtsv(dataframe)
 
 
 # parse s3 url to get bucket name and file path
@@ -75,36 +57,57 @@ def package_contents(group_dataframe):
 
 
 # to populate output tsv files
-def create_outputtsv(df, writer):
+def create_outputtsv(df):
     # package_attribute determines which attribute is used for packaging
     grouped = df.groupby(cfg["manifest"]["package_attribute"])
-    for group_key, group_value in grouped:
-        storage_url = df.loc[df["series_uid"] == group_key, "storage_urls"].values[0]
-        project_id = df.loc[df["series_uid"] == group_key, "acl"].values[0]
-        authz = "/programs/Open/projects/R1"
-        if "A1" in project_id:
-            authz = "/programs/Open/projects/A1"
-        try:
-            directory_name = split_s3_path(storage_url)
-            package_name, package_md5 = packaging.createZipFileStream(
-                cfg["aws"]["bucket"], directory_name, group_key, "dcm"
-            )
-            package_size = packaging.getPackageSize(package_name)
-            package_url = packaging.getPackageUrl(package_name)
-            writer.writerow(
-                [
-                    "package",
-                    package_md5,
-                    package_size,
-                    authz,
-                    package_url,
-                    package_name,
-                    str(package_contents(group_value)),
-                ]
-            )
-        except Exception as err:
-            logger.error(err)
-            raise
+    # output file to store package output
+    output_file = "output/output.tsv"
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    # create output file to store package contents
+    with open(
+        output_file, "w"
+    ) as tsvfile:  # "w" open file for writing and reading plain text, create a new file if not exists or truncate the file if exists.
+        writer = csv.writer(tsvfile, delimiter="\t", lineterminator="\n")
+        writer.writerow(
+            [
+                "record_type",
+                "md5",
+                "size",
+                "authz",
+                "url",
+                "file_name",
+                "package_contents",
+            ]
+        )
+        for group_key, group_value in grouped:
+            storage_url = df.loc[df["series_uid"] == group_key, "storage_urls"].values[
+                0
+            ]
+            project_id = df.loc[df["series_uid"] == group_key, "acl"].values[0]
+            authz = "/programs/Open/projects/R1"
+            if "A1" in project_id:
+                authz = "/programs/Open/projects/A1"
+            try:
+                directory_name = split_s3_path(storage_url)
+                package_name, package_md5 = packaging.createZipFileStream(
+                    cfg["aws"]["bucket"], directory_name, group_key, "dcm"
+                )
+                package_size = packaging.getPackageSize(package_name)
+                package_url = packaging.getPackageUrl(package_name)
+                writer.writerow(
+                    [
+                        "package",
+                        package_md5,
+                        package_size,
+                        authz,
+                        package_url,
+                        package_name,
+                        str(package_contents(group_value)),
+                    ]
+                )
+            except Exception as err:
+                logger.error(err)
+                raise
 
 
 if __name__ == "__main__":

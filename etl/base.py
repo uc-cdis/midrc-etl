@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import csv
 import yaml
@@ -67,7 +68,7 @@ def create_outputtsv(df):
     with open(
         output_file, "w"
     ) as tsvfile:  # "w" open file for writing and reading plain text, create a new file if not exists or truncate the file if exists.
-        writer = csv.writer(tsvfile, delimiter="\t", lineterminator="\n")
+        writer = csv.writer(tsvfile, delimiter="\t", lineterminator="\n", quotechar="&")
         writer.writerow(
             [
                 "record_type",
@@ -102,7 +103,7 @@ def create_outputtsv(df):
                         authz,
                         package_url,
                         package_name,
-                        str(package_contents(group_value)),
+                        json.dumps(package_contents(group_value)),
                     ]
                 )
             except Exception as err:

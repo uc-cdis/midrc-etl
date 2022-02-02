@@ -52,7 +52,11 @@ def package_contents(group_dataframe):
         size = row["file_size"]
         md5 = row["md5sum"]
         file_name = row["file_name"]
-        row_entry = {"hashes": {"md5sum": md5}, "file_name": file_name, "size": size}
+        row_entry = {
+            "hashes": {"md5sum": md5},
+            "file_name": file_name,
+            "size": int(size),
+        }
         package_contents.append(row_entry)
     return package_contents
 

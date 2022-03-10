@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "midrc-etl"
+version = "0.1.0"
+description = ""
+authors = []
+license = "Apache-2.0"
+packages = [
+    { include = "v2" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+[tool.poetry.dev-dependencies]
+black = "^22.1.0"
+pycodestyle = "^2.8.0"
+pylint = "^2.12.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+package_stuff = "v2.package_series:main"

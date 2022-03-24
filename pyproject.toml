@@ -10,6 +10,8 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
+boto3 = "^1.21.25"
+pqdm = "^0.2.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"

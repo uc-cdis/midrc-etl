@@ -1,4 +1,9 @@
+"""
+Packaging script
+"""
+
 import csv
+import json
 import zipfile
 from collections import defaultdict
 from hashlib import md5
@@ -18,21 +23,22 @@ dst_bucket = s3.Bucket(DST_BUCKET)
 series = defaultdict(list)
 
 
-def create_archive(file_urls, series_id):
+def create_archive(files, series_id):
     """
     Creates archive for package
     """
     archive = BytesIO()
 
     with zipfile.ZipFile(archive, "w") as zip_archive:
-        for file_url in file_urls:
+        for filename, file_url in files:
             file_obj = BytesIO()
-            obj_path = "/".join(file_url.split("/")[3:])
+            # obj_path = "/".join(file_url.split("/")[3:])
+            obj_path = file_url
 
             obj = src_bucket.Object(obj_path)
             obj.download_fileobj(file_obj)
 
-            filename = file_url.split("/")[-1]
+            # filename = file_url.split("/")[-1]
             in_zip_path = "{}/{}".format(series_id, filename)
 
             last_modified = obj.last_modified
@@ -52,16 +58,32 @@ def process_package_file(package_file):
     Process package file
     """
     line_split = package_file.split("/")
-    study_id = line_split[1]
-    series_id = line_split[2]
+    case_id = line_split[2]
+    study_id = line_split[3]
+    series_id = line_split[4]
     series_id = series_id.rsplit(".", 1)[0]
 
-    urls = []
-    with open(package_file) as series_file:
-        for line in series_file.readlines():
-            urls.append(line.strip())
+    files_metadata = []
+    files = []
+    with open(package_file, encoding="utf8") as series_file:
+        reader = csv.DictReader(series_file, delimiter="\t")
 
-    zip_obj = create_archive(urls, series_id)
+        # file_name	file_size	md5sum	case_id	study_uid	series_id	storage_urls
+        for row in reader:
+            file_name = row["file_name"]
+            url = row["storage_urls"].replace("s3://storage.ir.rsna.ai/", "")
+
+            files.append((file_name, url))
+
+            files_metadata.append(
+                {
+                    "hashes": {"md5sum": row["md5sum"]},
+                    "file_name": "{}/{}".format(series_id, file_name),
+                    "size": row["file_size"],
+                }
+            )
+
+    zip_obj = create_archive(files, series_id)
 
     size = zip_obj.getbuffer().nbytes
 
@@ -69,13 +91,15 @@ def process_package_file(package_file):
     md5sum = md5(zip_obj.getbuffer())
     md5sum = md5sum.hexdigest()
 
-    zip_file_name = "{}/{}.zip".format(study_id, series_id)
+    zip_file_name = "{}/{}/{}.zip".format(case_id, study_id, series_id)
     zip_url = "zip/{}".format(zip_file_name)
 
     zip_obj.seek(0)
     dst_bucket.Object(zip_url).upload_fileobj(zip_obj)
 
-    with open("packages/{}.txt".format(series_id), "w") as tsv_result_file:
+    with open(
+        "packages/{}.txt".format(series_id), "w", encoding="utf8"
+    ) as tsv_result_file:
         fieldnames = [
             "record_type",
             "guid",
@@ -99,25 +123,18 @@ def process_package_file(package_file):
                 "authz": "",
                 "url": zip_url,
                 "file_name": zip_file_name,
-                "package_contents": [
-                    {
-                        "hashes": {"md5sum": ""},
-                        "file_name": "{}/{}".format(series_id, f.split("/")[-1]),
-                        "size": -1,
-                    }
-                    for f in urls
-                ],
+                "package_contents": json.dumps(files_metadata),
             }
         )
 
 
 def main():
-    print("Hello World!")
+    """Boilerplate for entrypoint for packaging script."""
 
 
 if __name__ == "__main__":
     package_files = []
-    with open("cases.txt") as cases_file:
+    with open("./packages.txt", encoding="utf8") as cases_file:
         for line in cases_file.readlines():
             line = line.strip()
             package_files.append(line)

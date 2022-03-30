@@ -1,0 +1,15 @@
+metadata:
+  name: hello
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      container:
+        name: pod
+        image: 'docker/whalesay:latest'
+        command:
+          - bash
+          - -c
+        args:
+          - "echo 'Hello World!'"

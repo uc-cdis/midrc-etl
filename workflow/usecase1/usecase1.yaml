@@ -1,0 +1,19 @@
+metadata:
+  name: uc1-1
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      container:
+        name: pod
+        image: 'midrc-jupyter-minimal-notebook:latest'
+        imagePullPolicy: Never
+        command:
+          - bash
+          - -c
+        args:
+          - echo "start";
+            cd /home/jovyan/usecase1;
+            papermill checkColumns.ipynb out.ipynb -p folderPath './data/RSNA/';
+            echo "end";

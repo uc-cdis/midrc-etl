@@ -1,0 +1,6 @@
+datasets.submitter_id	submitter_id	type	age_at_index	covid19_positive	case_ids	country_of_origin	ethnicity	icu_indicator	index_event	race	sex	site_id	treatment_info	ventilator_indicator	zip	project_id
+	419639-000314		44	No	419639-000314	United States of America	Not Hispanic or Latino			Asian	Female	419639			946	Open-R1
+	419639-000331		69	Yes	419639-000331	United States of America	Not Hispanic or Latino			White	Male	419639			941	Open-R1
+	419639-000415		71	No	419639-000415	United States of America	Not Hispanic or Latino			White	Female	419639			941	Open-R1
+	419639-000441		53	No	419639-000441	United States of America	Not Hispanic or Latino			Asian	Male	419639			946	Open-R1
+	419639-000455		62	No	419639-000455	United States of America	Not Hispanic or Latino			Asian	Female	419639			941	Open-R1

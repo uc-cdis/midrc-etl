@@ -10,6 +10,8 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
+boto3 = "^1.21.25"
+pqdm = "^0.2.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
@@ -21,4 +23,6 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-package_stuff = "v2.package_series:main"
+package-stuff = "v2.package_series:main"
+convert-acr = "conversion.convert_acr:main"
+convert-rsna = "conversion.convert_rsna:main"

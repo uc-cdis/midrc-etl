@@ -6,12 +6,16 @@ authors = []
 license = "Apache-2.0"
 packages = [
     { include = "v2" },
+    { include = "notebooks" },
 ]
 
 [tool.poetry.dependencies]
 python = "^3.10"
 boto3 = "^1.21.25"
 pqdm = "^0.2.0"
+jupyterlab = "^3.3.2"
+papermill = "^2.3.4"
+pandas = "^1.4.2"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"

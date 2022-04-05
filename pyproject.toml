@@ -6,7 +6,6 @@ authors = []
 license = "Apache-2.0"
 packages = [
     { include = "v2" },
-    { include = "notebooks" },
 ]
 
 [tool.poetry.dependencies]

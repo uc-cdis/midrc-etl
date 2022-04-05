@@ -7,7 +7,7 @@ spec:
     - name: main
       container:
         name: pod
-        image: 'midrc-jupyter-minimal-notebook:latest'
+        image: "midrc-jupyter-minimal-notebook:latest"
         imagePullPolicy: Never
         command:
           - bash

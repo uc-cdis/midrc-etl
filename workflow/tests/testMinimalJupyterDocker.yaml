@@ -7,7 +7,7 @@ spec:
     - name: main
       container:
         name: pod
-        image: 'jupyter-new:latest'
+        image: "jupyter-new:latest"
         imagePullPolicy: Never
         command:
           - bash

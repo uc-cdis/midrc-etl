@@ -7,7 +7,7 @@ spec:
     - name: main
       container:
         name: pod
-        image: 'docker/whalesay:latest'
+        image: "docker/whalesay:latest"
         command:
           - bash
           - -c

@@ -5,6 +5,7 @@ Packaging script
 import csv
 import json
 import zipfile
+import os
 from collections import defaultdict
 from hashlib import md5
 from io import BytesIO
@@ -21,6 +22,10 @@ src_bucket = s3.Bucket(SRC_BUCKET)
 dst_bucket = s3.Bucket(DST_BUCKET)
 
 series = defaultdict(list)
+
+FOLDER = "."
+# FOLDER = "./packages_acrimage/2021/09"
+# FOLDER = "./packages_acrimage/2021/0827"
 
 
 def create_archive(files, series_id):
@@ -65,13 +70,20 @@ def process_package_file(package_file):
 
     files_metadata = []
     files = []
-    with open(package_file, encoding="utf8") as series_file:
+    with open(FOLDER + "/" + package_file, encoding="utf8") as series_file:
         reader = csv.DictReader(series_file, delimiter="\t")
 
         # file_name	file_size	md5sum	case_id	study_uid	series_id	storage_urls
         for row in reader:
             file_name = row["file_name"]
             url = row["storage_urls"].replace("s3://storage.ir.rsna.ai/", "")
+            # for ACR
+            # url = row["storage_urls"].replace("//", "replicated-data-acr/")
+            # for ACR batch6
+            # url = row["storage_urls"]
+            # url = url.replace("//", "replicated-data-acr/")
+            # url = url.replace("/0914/", "/10/batch6/")
+            # print(url)
 
             files.append((file_name, url))
 
@@ -98,7 +110,7 @@ def process_package_file(package_file):
     dst_bucket.Object(zip_url).upload_fileobj(zip_obj)
 
     with open(
-        "packages/{}.txt".format(series_id), "w", encoding="utf8"
+        FOLDER + "/packages/{}.txt".format(series_id), "w", encoding="utf8"
     ) as tsv_result_file:
         fieldnames = [
             "record_type",
@@ -134,10 +146,12 @@ def main():
 
 if __name__ == "__main__":
     package_files = []
-    with open("./packages.txt", encoding="utf8") as cases_file:
+    with open(FOLDER + "/packages.txt", encoding="utf8") as cases_file:
         for line in cases_file.readlines():
             line = line.strip()
             package_files.append(line)
             # break
+
+    os.makedirs(FOLDER + "/packages", exist_ok=True)
 
     result = pqdm(package_files, process_package_file, n_jobs=6)

@@ -22,11 +22,11 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="$PATH:/$APPNAME/.venv/bin/"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc=4:10.2.1-1 linux-libc-dev=5.10.106-1 libc6-dev=2.31-13+deb11u3 postgresql=13+225 \
+    && apt-get install -y --no-install-recommends gcc=4:10.2.1-6 linux-libc-dev=5.10.120-1 libc6-dev=2.31-13+deb11u3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/
 
-RUN pip install --upgrade pip==22.0.4 poetry==1.1.13
+RUN pip install --upgrade pip==22.1.2 poetry==1.1.13
 
 WORKDIR /$APPNAME
 

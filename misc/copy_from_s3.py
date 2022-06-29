@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import csv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
@@ -9,15 +11,19 @@ import tqdm
 def copy_file(
     s3: boto3.session.Session.resource, src_bucket: str, dst_bucket: str, key: str
 ):
+    # key = key.replace("s3://open-data-midrc/", "")
     copy_source = {"Bucket": src_bucket, "Key": key}
     bucket.copy(copy_source, key)
+    # move_source = {"Bucket": src_bucket, "Key": key}
+    # bucket.move(move_source, key)
 
 
-INPUT_FILE = "./open.txt"
-# INPUT_FILE = "./seq.txt"
+INPUT_FILE = "./files.tsv"
+# INPUT_FILE = "./raw_seq_imaging_data_manifest_2021_10_08.tsv"
 
 s3 = boto3.resource("s3")
-SRC_BUCKET = "internal-data-midrc-replication"
+SRC_BUCKET = "external-data-midrc-replication"
+# SRC_BUCKET = "internal-data-midrc-replication"
 DST_BUCKET = "open-data-midrc"
 # DST_BUCKET = "sequestered-data-midrc"
 bucket = s3.Bucket(DST_BUCKET)

@@ -23,7 +23,7 @@ dst_bucket = s3.Bucket(DST_BUCKET)
 
 series = defaultdict(list)
 
-FOLDER = "."
+FOLDER = "/home/ubuntu/wd/output/RSNA_20220308"
 # FOLDER = "./packages_acrimage/2021/09"
 # FOLDER = "./packages_acrimage/2021/0827"
 

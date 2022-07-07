@@ -10,6 +10,11 @@ import pandas as pd
 
 locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 
+
+def remove_prefix(text, prefix):
+    return text[text.startswith(prefix) and len(prefix) :]
+
+
 parser = argparse.ArgumentParser(description="Process RSNA submission")
 parser.add_argument(
     "--submission",
@@ -71,7 +76,7 @@ def process_submission(submission, input_path, output_path):
 
     studies = studies.rename(columns=rename_columns_studies)
 
-    studies["case_id"] = studies["case_id"].apply(lambda v: v.removeprefix("Case_"))
+    studies["case_id"] = studies["case_id"].apply(lambda v: remove_prefix(v, "Case_"))
 
     studies = studies[["study_id", "case_id"]]
 
@@ -97,7 +102,7 @@ def process_submission(submission, input_path, output_path):
 
     all_series = pd.concat(series)
     all_series["case_id"] = all_series["case_id"].apply(
-        lambda v: v.removeprefix("Case_")
+        lambda v: remove_prefix(v, "Case_")
     )
     all_series["study_id"] = all_series["study_id"].apply(
         lambda v: id_regex.search(v).group(0)
@@ -120,7 +125,7 @@ def process_submission(submission, input_path, output_path):
 
     all_instances = pd.concat(instances)
     all_instances["case_id"] = all_instances["case_id"].apply(
-        lambda v: v.removeprefix("Case_")
+        lambda v: remove_prefix(v, "Case_")
     )
     all_instances["instance_id"] = all_instances["instance_id"].apply(
         lambda v: id_regex.search(v).group(0)

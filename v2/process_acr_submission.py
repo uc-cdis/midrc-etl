@@ -1,5 +1,6 @@
 import argparse
 import csv
+from email.mime import image
 import locale
 from itertools import chain
 from pathlib import Path
@@ -31,10 +32,87 @@ parser.add_argument(
     required=True,
     help="output path for packages information",
 )
+parser.add_argument(
+    "--new",
+    default=True,
+    action="store_true",
+    help='for "new"-style submissions',
+)
 args = parser.parse_args()
 
 
-def process_submission(submission, input_path, output_path):
+def process_submission_new(submission, input_path, output_path):
+    print(submission)
+    packages_path = Path(output_path) / submission
+    packages_path.mkdir(parents=True, exist_ok=True)
+
+    submission_path = Path(input_path) / submission
+
+    image_manifest_file = list(submission_path.glob("*manifest*.tsv"))
+    print(image_manifest_file)
+
+    assert (
+        len(image_manifest_file) == 1
+    ), "only one manifest should exist in the submission"
+
+    image_manifest_file = image_manifest_file[0]
+
+    rename_columns = {
+        "case_ids": "case_id",
+        "study_uid": "study_id",
+        "series_uid": "series_id",
+        "instance_uid": "instance_id",
+    }
+
+    instances = pd.read_csv(image_manifest_file, sep="\t").rename(
+        columns=rename_columns
+    )
+    instances = instances.drop(columns=["modality"])
+    instances["storage_urls"] = instances["storage_urls"].apply(
+        lambda v: v.replace("//", "replicated-data-acr/")
+    )
+    instances["file_name"] = instances["file_name"].apply(lambda v: v.split("/")[-1])
+
+    list_of_packages = []
+
+    for _, row in instances.iterrows():
+        case_id = row["case_id"]
+        study_id = row["study_id"]
+        series_id = row["series_id"]
+
+        series_path = f"./cases/{case_id}/{study_id}/{series_id}.tsv\n"
+        if series_path not in list_of_packages:
+            list_of_packages.append(series_path)
+
+        folder = packages_path / "cases" / case_id / study_id
+
+        folder.mkdir(parents=True, exist_ok=True)
+
+        series_file = folder / f"{series_id}.tsv"
+        series_file_exist = series_file.exists()
+
+        with open(series_file, mode="a") as f:
+            fieldnames = [
+                "file_name",
+                "file_size",
+                "md5sum",
+                "case_id",
+                "study_id",
+                "series_id",
+                "instance_id",
+                "storage_urls",
+            ]
+            writer = csv.DictWriter(f, delimiter="\t", fieldnames=fieldnames)
+
+            if not series_file_exist:
+                writer.writeheader()
+            writer.writerow(row.to_dict())
+
+    with open(packages_path / "packages.txt", "w") as f:
+        f.writelines(list_of_packages)
+
+
+def process_submission_old(submission, input_path, output_path):
     # useful paths for data manipulation
     print(submission)
     packages_path = Path(output_path) / submission
@@ -175,4 +253,7 @@ def process_submission(submission, input_path, output_path):
 
 
 if __name__ == "__main__":
-    process_submission(args.submission, args.input_path, args.output_path)
+    if args.new:
+        process_submission_new(args.submission, args.input_path, args.output_path)
+    else:
+        process_submission_old(args.submission, args.input_path, args.output_path)

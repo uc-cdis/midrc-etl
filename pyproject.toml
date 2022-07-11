@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "midrc-etl"
+version = "0.1.0"
+description = ""
+authors = []
+license = "Apache-2.0"
+packages = [
+    { include = "v2" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+boto3 = "^1.21.25"
+pqdm = "^0.2.0"
+jupyterlab = "^3.3.2"
+papermill = "^2.3.4"
+pandas = "^1.4.2"
+urllib3 = "1.26.9"
+
+[tool.poetry.dev-dependencies]
+black = "^22.1.0"
+pycodestyle = "^2.8.0"
+pylint = "^2.12.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+package-stuff = "v2.package_series:main"
+convert-acr = "conversion.convert_acr:main"
+convert-rsna = "conversion.convert_rsna:main"

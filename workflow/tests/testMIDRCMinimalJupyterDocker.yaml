@@ -1,0 +1,16 @@
+metadata:
+  name: midrc-jupyter-minimal-notebook-test
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      container:
+        name: pod
+        image: "midrc-jupyter-minimal-notebook:latest"
+        imagePullPolicy: Never
+        command:
+          - bash
+          - -c
+        args:
+          - "echo 'Hello World from MIDRC Minimal Jupyter Docker'"

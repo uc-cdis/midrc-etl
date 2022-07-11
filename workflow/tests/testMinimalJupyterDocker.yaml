@@ -1,0 +1,16 @@
+metadata:
+  name: minimal-jupyter-docker
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      container:
+        name: pod
+        image: "jupyter-new:latest"
+        imagePullPolicy: Never
+        command:
+          - bash
+          - -c
+        args:
+          - "echo 'Hello World from Minimal Jupyter Docker'"

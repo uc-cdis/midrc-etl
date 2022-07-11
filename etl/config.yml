@@ -1,0 +1,8 @@
+manifest:
+    file_name: ./data/imaging_data_manifest_2021_09_23.tsv
+    package_attribute: series_uid
+
+aws:
+    access_key: test
+    secret_key: test
+    bucket: test

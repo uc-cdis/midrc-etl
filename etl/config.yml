@@ -10,3 +10,4 @@ aws:
 n3c:
     file_name: ./data/N3C-TransitTokens_ACR_TestBatch_SUBMISSION_20200705.csv
     query_attribute: 'ACR CASE ID'
+    commons: data.midrc.org

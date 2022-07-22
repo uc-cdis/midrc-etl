@@ -45,12 +45,12 @@ def get_guids(df):
 
 
 def create_output_file(list):
-    output_file = "output/output.tsv"
+    output_file = "output/METADATA.csv"
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(
         output_file, "w"
     ) as tsvfile:  # "w" open file for writing and reading plain text, create a new file if not exists or truncate the file if exists.
-        writer = csv.writer(tsvfile, delimiter="\t", lineterminator="\n", quotechar="&")
+        writer = csv.writer(tsvfile, delimiter="|", lineterminator="\n", quotechar="&")
         writer.writerow(
             [
                 "id",

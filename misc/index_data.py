@@ -24,7 +24,7 @@ def main():
         thread_num=6,
         auth=auth,
         replace_urls=False,
-        manifest_file_delimiter="\t"  # put "," if the manifest is csv file
+        manifest_file_delimiter="\t",  # put "," if the manifest is csv file
     )
 
 

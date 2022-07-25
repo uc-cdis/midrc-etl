@@ -23,7 +23,7 @@ def main():
     index = Gen3Index(auth_provider=auth)
 
     with open(MANIFEST) as to_remove_file:
-        to_remove_reader = csv.DictReader(to_remove_file, delimiter='\t', quotechar='"')
+        to_remove_reader = csv.DictReader(to_remove_file, delimiter="\t", quotechar='"')
         for row in to_remove_reader:
             did = row["did"]
             r = index.delete_record(guid=did)

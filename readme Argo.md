@@ -1,8 +1,8 @@
 Code Snippits
 
-#Docker 
+#Docker
 docker build -t midrc-jupyter-minimal-notebook:latest .
-docker run -it --rm midrc-jupyter-minimal-notebook:latest 
+docker run -it --rm midrc-jupyter-minimal-notebook:latest
 Pressing Ctrl-C twice shuts down the notebook server but leaves the container intact on disk for later restart or permanent deletion using commands like the following:
 docker ps -q --filter ancestor="midrc-jupyter-minimal-notebook:latest" | xargs -r docker stop
 

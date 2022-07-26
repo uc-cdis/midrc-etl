@@ -1,4 +1,4 @@
-FROM python:3.10-slim-bullseye AS python-base
+FROM python:3.9-slim-bullseye AS python-base
 
 ENV APPNAME=midrc-etl
 

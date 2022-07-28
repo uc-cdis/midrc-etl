@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 
+import archive
 import pandas as pd
 from gen3.auth import Gen3Auth
 from gen3.submission import Gen3Submission
@@ -37,7 +38,13 @@ parser.add_argument(
     required=True,
     help="Path to JSON file with credentials",
 )
-
+parser.add_argument(
+    "--archive-path",
+    action="store",
+    type=str,
+    required=True,
+    help="Path to JSON file with credentials",
+)
 args = parser.parse_args()
 
 
@@ -46,6 +53,8 @@ def main():
     query_attribute = args.query_attribute
     endpoint = args.endpoint
     creds = args.creds
+    archive_path = args.archive_path
+    output_path = "output/METADATA.csv"
 
     dataframe = pd.read_csv(
         crosswalk_file,
@@ -54,7 +63,14 @@ def main():
         low_memory=False,
         usecols=[query_attribute],
     )
-    get_guids(dataframe, endpoint, creds, query_attribute)
+    crosswalk = get_guids(dataframe, endpoint, creds, query_attribute)
+    create_output_file(crosswalk, output_path)
+
+    files = [
+        (crosswalk_file, "MIDRC_N3C_UCHICAGO_20220728_TOKENS.csv"),
+        (output_path, "MIDRC_N3C_UCHICAGO_20220728_METADATA.csv"),
+    ]
+    archive.create_archive(files, archive_path)
 
 
 def get_guids(df, endpoint, creds, query_attribute):
@@ -99,11 +115,10 @@ def get_guids(df, endpoint, creds, query_attribute):
                 }
             )
 
-    create_output_file(crosswalk)
+    return crosswalk
 
 
-def create_output_file(crosswalk):
-    output_file = "output/METADATA.csv"
+def create_output_file(crosswalk, output_file):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w") as f:
         fieldnames = ["record_id", "midrc_image_guid", "midrc_case_id"]

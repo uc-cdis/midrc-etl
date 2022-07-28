@@ -111,7 +111,7 @@ def get_guids(df, endpoint, creds, query_attribute):
                 {
                     "record_id": i["case_ids"][0],
                     "midrc_image_guid": i["object_id"],
-                    "midrc_case_id": case_uuid,
+                    "midrc_case_submitter_id": case_uuid,
                 }
             )
 

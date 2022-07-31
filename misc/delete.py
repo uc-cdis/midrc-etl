@@ -7,9 +7,7 @@ from tqdm import tqdm
 
 start_time = time.time()
 
-headers = {
-    "Authorization": ""
-}
+headers = {"Authorization": ""}
 
 
 async def main():
@@ -26,13 +24,16 @@ async def main():
                         if r_rev.status == 200:
                             json_body = await r_rev.json()
                             rev = json_body["rev"]
-                            del_url = "https://validate.midrc.org/index/index/{}?rev={}".format(guid, rev)
+                            del_url = "https://validate.midrc.org/index/index/{}?rev={}".format(
+                                guid, rev
+                            )
 
                             async with session.delete(del_url) as r:
                                 result_file.write("{} {}\n".format(guid, r.status))
 
                     # async with session.delete(url) as resp:
                     #     result_file.write("{} {}\n".format(guid, resp.status))
+
 
 loop = asyncio.get_event_loop()
 result = loop.run_until_complete(main())

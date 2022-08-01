@@ -104,7 +104,11 @@ def get_guids(df, endpoint, creds, query_attribute):
     case_data = sub.query(cases_query, {"submitter_id": cases})
     case_ids = {v["submitter_id"]: v["id"] for v in case_data["data"]["case"]}
 
+    n = 1
+    print(len(case_ids))
     for case, case_uuid in case_ids.items():
+        print(n)
+        n += 1
         r = sub.query(query_string, {"case_ids": case})
         for i in r["data"]["datanode"]:
             crosswalk.append(
@@ -121,7 +125,7 @@ def get_guids(df, endpoint, creds, query_attribute):
 def create_output_file(crosswalk, output_file):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w") as f:
-        fieldnames = ["record_id", "midrc_image_guid", "midrc_case_id"]
+        fieldnames = ["record_id", "midrc_image_guid", "midrc_case_submitter_id"]
         writer = csv.DictWriter(
             f, delimiter="|", lineterminator="\n", quotechar="&", fieldnames=fieldnames
         )

@@ -1,0 +1,39 @@
+metadata:
+  name: s15
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+    - name: main 
+      steps:
+        - - name: step1
+            template: step1-install-packages
+            arguments: {}
+        - - name: step2
+            template: step2-run-py-script
+            arguments: {}
+    - name: step1-install-packages
+      container:
+        name: midrcpod
+        image: "quay.io/cdis/midrc-etl:v3"
+        command:
+          - bash
+          - -c
+        args:
+          - echo "installing packages";
+            pip install numpy;
+            pip install pandas;
+            echo "packages installed"; 
+            echo "start script";
+            cd v3; 
+            python3 process_acr_submission.py --submission ACR_20220314 --input_path /Users/andrewprokhorenkov/CTDS/projects/midrc/ssot-s3/replicated-data-acr --output_path /Users/andrewprokhorenkov/CTDS/projects/midrc/indexing-data/packages_acr
+            echo "end script";
+    - name: step2-run-py-script
+      container:
+        name: midrcpod
+        image: "quay.io/cdis/midrc-etl:v3"
+        command:
+          - bash
+          - -c
+        args:
+          - echo "Test Step 2";

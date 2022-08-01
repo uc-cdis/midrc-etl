@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
+# locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 
 parser = argparse.ArgumentParser(description="Process ACR submission")
 parser.add_argument(

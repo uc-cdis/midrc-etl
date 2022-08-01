@@ -1,0 +1,17 @@
+metadata:
+  name: s1
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      container:
+        name: midrcpod
+        image: "quay.io/cdis/midrc-etl:v3"
+        command:
+          - bash
+          - -c
+        args:
+          - echo "start";
+            ls;
+            echo "end";

@@ -1,0 +1,19 @@
+metadata:
+  name: s15
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+    - name: main 
+      steps:
+        - - name: step1
+            template: step1-get-home-folder
+            arguments: {}
+    - name: step1-get-home-folder
+      container:
+        name: midrcpod
+        image: "amazon/aws-cli:2.4.22"
+        serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+        automountServiceAccountToken: true
+        command:
+          - ls

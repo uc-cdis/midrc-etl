@@ -17,8 +17,6 @@ spec:
         name: midrcpod
         image: "quay.io/cdis/midrc-etl:v3"
         imagePullPolicy: "Always"
-        serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
-        automountServiceAccountToken: true
         command:
           - bash
           - -c
@@ -30,6 +28,8 @@ spec:
             cd v3; 
             ls;
             echo "end script";
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
     - name: step2-run-py-script
       container:
         name: midrcpod

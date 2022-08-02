@@ -17,6 +17,8 @@ spec:
         name: midrcpod
         image: "quay.io/cdis/midrc-etl:v3"
         imagePullPolicy: "Always"
+        serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+        automountServiceAccountToken: true
         command:
           - bash
           - -c

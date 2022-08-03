@@ -25,8 +25,8 @@ series = defaultdict(list)
 
 # s3://external-data-midrc-replication/replicated-data-acr/ACR_20211115/clinical_manifestfile_ACR_20211115.tsv
 
-s3.meta.client.download_file('external-data-midrc-replication', 'replicated-data-acr/ACR_20211115/cp_clinical_manifestfile_ACR_20211115.tsv', 'midrc-etl/v3')
-
+s3.meta.client.download_file('external-data-midrc-replication', 'replicated-data-acr/ACR_20211115/clinical_manifestfile_ACR_20211115.tsv', '/midrc-etl/v3')
+                                     
 FOLDER = "/midrc-etl/v3"
 # FOLDER = "./packages_acrimage/2021/09"
 # FOLDER = "./packages_acrimage/2021/0827"

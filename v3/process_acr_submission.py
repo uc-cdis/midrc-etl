@@ -7,18 +7,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import os
 
 # locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 
 s3 = boto3.resource("s3")
 # s3://external-data-midrc-replication/replicated-data-acr/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv
-
-
-s3.meta.client.download_file(
-    "external-data-midrc-replication",
-    "replicated-data-acr/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv",
-    "/midrc-data/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv",
-)
 
 parser = argparse.ArgumentParser(description="Process ACR submission")
 parser.add_argument(
@@ -48,7 +42,23 @@ parser.add_argument(
     action="store_true",
     help='for "new"-style submissions',
 )
+parser.add_argument(
+    "--s3key",
+    action="store",
+    type=str,
+    help="s3key for manifest",
+)
+
 args = parser.parse_args()
+
+
+def download_manifest(s3key, submission, input_path):
+    fname = os.path.basename(s3key)
+    s3.meta.client.download_file(
+        "external-data-midrc-replication",
+        s3key,
+        Path(input_path) / submission / fname,
+    )
 
 
 def process_submission_new(submission, input_path, output_path):
@@ -264,6 +274,8 @@ def process_submission_old(submission, input_path, output_path):
 
 if __name__ == "__main__":
     if args.new:
+        if args.s3key is not None:
+            download_manifest(args.s3key, args.submission, args.input_path)
         process_submission_new(args.submission, args.input_path, args.output_path)
     else:
         process_submission_old(args.submission, args.input_path, args.output_path)

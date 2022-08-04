@@ -1,0 +1,30 @@
+metadata:
+  name: testingestion
+  namespace: argo
+spec:
+  templates:
+    - name: main
+      inputs: {}
+      outputs: {}
+      metadata: {}
+      container:
+        name: midrcpod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+          - bash
+          - '-c'
+        args:
+          - >-
+            cd /midrc-etl/v3; rm -r output; mkdir -p /midrc-data/ACR_20220415/;
+            echo "RUNNING SCRIPT 1"; poetry run python
+            /midrc-etl/v3/process_acr_submission.py --submission ACR_20220314
+            --input_path $(pwd) --output_path $(pwd)/output --new; echo "SCRIPT
+            1 HAS RUN"; echo "RUNNING SCRIPT 2"; poetry run python
+            /midrc-etl/v3/package_series.py; echo "SCRIPT 2 HAS RUN"; echo
+            "LISTING FILES IN DIRECTORY"; cd v3; ls; echo "END OF WORKFLOW";
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+  entrypoint: main
+  arguments: {}

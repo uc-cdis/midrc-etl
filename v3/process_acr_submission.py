@@ -10,6 +10,16 @@ import pandas as pd
 
 # locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 
+s3 = boto3.resource("s3")
+# s3://external-data-midrc-replication/replicated-data-acr/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv
+
+
+s3.meta.client.download_file(
+    "external-data-midrc-replication",
+    "replicated-data-acr/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv",
+    "/midrc-data/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv",
+)
+
 parser = argparse.ArgumentParser(description="Process ACR submission")
 parser.add_argument(
     "--submission",

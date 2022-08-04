@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import os
+import boto3
 
 # locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 

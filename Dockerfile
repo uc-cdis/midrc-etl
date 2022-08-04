@@ -26,7 +26,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/
 
-RUN pip install --upgrade pip==22.2.1 poetry==1.1.14
+RUN pip install --no-cache-dir --upgrade pip==22.2.1 poetry==1.1.14
 
 WORKDIR /$APPNAME
 

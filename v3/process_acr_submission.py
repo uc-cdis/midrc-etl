@@ -58,7 +58,7 @@ def download_manifest(s3key, submission, input_path):
     s3.meta.client.download_file(
         "external-data-midrc-replication",
         s3key,
-        Path(input_path) / submission / fname,
+        Path(Path(input_path) / submission / fname).as_posix(),
     )
 
 

@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: slack-test-
+  namespace: argo
+spec:
+  entrypoint: notify-slack
+  templates:
+    - name: notify-slack
+      script:
+        image: "quay.io/cdis/midrc-etl:v3"
+        command: [python]
+        source: |
+          import os
+          import http.client
+          import json
+          from urllib.parse import urlparse
+
+          url = os.environ.get("HOOKURL")
+          endpoint = urlparse(url).path
+          
+          conn = http.client.HTTPSConnection("hooks.slack.com")
+          
+          payload = {"text": "Hello, World! Workflow {{workflow.name}}!"}
+          payload = json.dumps(payload)
+          
+          headers = {"Content-Type": "application/json"}
+          
+          conn.request("POST", endpoint, payload, headers)
+          
+          res = conn.getresponse()
+          data = res.read()
+          
+          print(data.decode("utf-8"))
+        env:
+          - name: HOOKURL
+            valueFrom:
+              secretKeyRef:
+                name: argo-webhook-url
+                key: webhook-url

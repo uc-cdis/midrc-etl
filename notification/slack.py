@@ -4,6 +4,8 @@ import json
 import sys
 from urllib.parse import urlparse
 
+print("Inside python program")
+
 url = os.environ.get("HOOKURL")
 endpoint = urlparse(url).path
 

@@ -78,6 +78,7 @@ mr = pd.read_csv(mr_file, sep="\t", header=0, dtype=str)
 # concatting data into one data frame
 base_mdata = pd.concat([cr, ct, dx, mr])
 
+# Uploading file for next step
 base_mdata.to_csv("baseMLData.csv")
 
 s3 = boto3.resource("s3")
@@ -87,6 +88,5 @@ SRC_BUCKET = "processing-data-midrc-replication"
 src_bucket = s3.Bucket(SRC_BUCKET)
 
 s3.client.upload_file(
-    "baseMLData.csv" "external-data-midrc-replication",
-    (args.name / "baseMLData.csv"),
+    "baseMLData.csv", "external-data-midrc-replication", (args.name / "baseMLData.csv")
 )

@@ -50,6 +50,7 @@ dataset = mdata_mp[["pixel_spacing", "manufacturer"]]
 dataset.to_csv("cleanedData.csv")
 
 s3.client.upload_file(
-    "cleanedData.csv" "external-data-midrc-replication",
+    "cleanedData.csv",
+    "external-data-midrc-replication",
     (args.name / "cleanedData.csv"),
 )

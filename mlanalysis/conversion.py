@@ -59,7 +59,9 @@ dataset = dataset[["pixel_spacing", "manufacturer"]]
 # Writing new CSV file for next step
 dataset.to_csv("convertedData.csv")
 
+# Uploading data file for next step
 s3.client.upload_file(
-    "convertedData.csv" "external-data-midrc-replication",
+    "convertedData.csv",
+    "external-data-midrc-replication",
     (args.name / "convertedData.csv"),
 )

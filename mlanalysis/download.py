@@ -19,7 +19,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 api = "https://data.midrc.org"
-auth = Gen3Auth()
+auth = Gen3Auth(idp="default")
 sub = Gen3Submission(api, auth)
 
 

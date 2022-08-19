@@ -1,17 +1,18 @@
 metadata:
-  name: MLTest
+  generateName: mltestwf
   namespace: argo
 spec:
   entrypoint: main
   templates:
     - name: download
-    container:
-      image: 'quay.io/cdis/midrc-etl:v3'
-      command:
-          - bash
-          - '-c'
+      container:
+        name: downloadPod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
         args:
-          - poetry run python /midrc-etl/mlanalysis/download.py -- {{workflow.name}};
+            - poetry run python /midrc-etl/mlanalysis/download.py --name {{workflow.name}};
         resources: {}
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
@@ -21,91 +22,98 @@ spec:
           gen3username: "osdominguez@uchicago.edu"
 
     - name: cleaning
-    container:
-      image: 'quay.io/cdis/midrc-etl:v3'
-      command:
-          - bash
-          - '-c'
+      container:
+        name: cleaningPod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
         args:
-          - poetry run python /midrc-etl/mlanalysis/cleaning.py -- {{workflow.name}};
+            - poetry run python /midrc-etl/mlanalysis/cleaning.py --name {{workflow.name}};
         resources: {}
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
       automountServiceAccountToken: true
 
     - name: conversion
-    container:
-      image: 'quay.io/cdis/midrc-etl:v3'
-      command:
-          - bash
-          - '-c'
+      container:
+        name: conversionPod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
         args:
-          - poetry run python /midrc-etl/mlanalysis/conversion.py -- {{workflow.name}};
+            - poetry run python /midrc-etl/mlanalysis/conversion.py --name {{workflow.name}};
         resources: {}
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
       automountServiceAccountToken: true
 
     - name: model1
-    container:
-      image: 'quay.io/cdis/midrc-etl:v3'
-      command:
-          - bash
-          - '-c'
+      container:
+        name: ml1Pod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
         args:
-          - poetry run python /midrc-etl/mlanalysis/mlmodel1.py -- {{workflow.name}};
+            - poetry run python /midrc-etl/mlanalysis/mlmodel1.py --name {{workflow.name}};
         resources: {}
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
       automountServiceAccountToken: true
 
     - name: model2
-    container:
-      image: 'quay.io/cdis/midrc-etl:v3'
-      command:
-          - bash
-          - '-c'
+      container:
+        name: ml2Pod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
         args:
-          - poetry run python /midrc-etl/mlanalysis/mlmodel2.py -- {{workflow.name}};
+            - poetry run python /midrc-etl/mlanalysis/mlmodel2.py --name {{workflow.name}};
         resources: {}
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
       automountServiceAccountToken: true
 
     - name: model3
-    container:
-      image: 'quay.io/cdis/midrc-etl:v3'
-      command:
-          - bash
-          - '-c'
+      container:
+        name: ml3Pod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
         args:
-          - poetry run python /midrc-etl/mlanalysis/mlmodel3.py -- {{workflow.name}};
+            - poetry run python /midrc-etl/mlanalysis/mlmodel3.py --name {{workflow.name}};
         resources: {}
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
       automountServiceAccountToken: true
 
     - name: model4
-    container:
-      image: 'quay.io/cdis/midrc-etl:v3'
-      command:
-          - bash
-          - '-c'
+      container:
+        name: ml4Pod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
         args:
-          - poetry run python /midrc-etl/mlAnalysis/mlmodel4.py -- {{workflow.name}};
+            - poetry run python /midrc-etl/mlAnalysis/mlmodel4.py --name {{workflow.name}};
         resources: {}
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
       automountServiceAccountToken: true
 
     - name: compare
-    container:
-      image: 'quay.io/cdis/midrc-etl:v3'
-      command:
-          - bash
-          - '-c'
+      container:
+        name: comparePod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
         args:
-          - poetry run python /midrc-etl/mlAnalysis/compare.py -- {{workflow.name}};
+            - poetry run python /midrc-etl/mlAnalysis/compare.py --name {{workflow.name}};
         resources: {}
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
@@ -125,7 +133,7 @@ spec:
           depends: "Cleaning"
           template: conversion
 
-        - name: MLM2
+        - name: MLM1
           depends: "Conversion"
           template: model1
 
@@ -142,7 +150,7 @@ spec:
           template: model4
 
         - name: Compare
-          depends: "model1 && model2 && model3 && model4"
+          depends: "MLM1 && MLM2 && MLM3 && MLM4"
           template: compare
 
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount

@@ -25,7 +25,7 @@ src_bucket = s3.Bucket(SRC_BUCKET)
 
 s3.meta.client.download_file(
     "processing-data-midrc-replication",
-    args.name / "baseMLData.csv",
+    args.name + "/" + "baseMLData.csv",
     Path("/midrc-etl/mlAnalysis/baseMLData.csv").as_posix(),
 )
 
@@ -51,6 +51,6 @@ dataset.to_csv("cleanedData.csv")
 
 s3.meta.client.upload_file(
     "cleanedData.csv",
-    "external-data-midrc-replication",
-    Path(args.name / "cleanedData.csv").as_posix(),
+    "processing-data-midrc-replication",
+    Path(args.name + "/" + "cleanedData.csv").as_posix(),
 )

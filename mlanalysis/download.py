@@ -89,6 +89,6 @@ src_bucket = s3.Bucket(SRC_BUCKET)
 
 s3.meta.client.upload_file(
     "baseMLData.csv",
-    "external-data-midrc-replication",
+    "processing-data-midrc-replication",
     Path(args.name + "/" + "baseMLData.csv").as_posix(),
 )

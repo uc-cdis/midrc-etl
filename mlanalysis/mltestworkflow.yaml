@@ -2,6 +2,9 @@ metadata:
   generateName: mltestwf
   namespace: argo
 spec:
+  podMetadata:
+        annotations:
+          gen3username: "osdominguez@uchicago.edu"
   entrypoint: main
   templates:
     - name: download
@@ -17,9 +20,6 @@ spec:
         imagePullPolicy: Always
       serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
       automountServiceAccountToken: true
-      podMetadata:
-        annotations:
-          gen3username: "osdominguez@uchicago.edu"
 
     - name: cleaning
       container:

@@ -23,7 +23,7 @@ SRC_BUCKET = "processing-data-midrc-replication"
 
 src_bucket = s3.Bucket(SRC_BUCKET)
 
-s3.client.download_file(
+s3.meta.client.download_file(
     "processing-data-midrc-replication",
     args.name / "baseMLData.csv",
     Path("/midrc-etl/mlAnalysis/baseMLData.csv").as_posix(),
@@ -49,7 +49,7 @@ dataset = mdata_mp[["pixel_spacing", "manufacturer"]]
 # Writing new CSV file for next step
 dataset.to_csv("cleanedData.csv")
 
-s3.client.upload_file(
+s3.meta.client.upload_file(
     "cleanedData.csv",
     "external-data-midrc-replication",
     (args.name / "cleanedData.csv"),

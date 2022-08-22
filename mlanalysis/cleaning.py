@@ -26,11 +26,11 @@ src_bucket = s3.Bucket(SRC_BUCKET)
 s3.meta.client.download_file(
     "processing-data-midrc-replication",
     args.name + "/" + "baseMLData.csv",
-    Path("/midrc-etl/mlAnalysis/baseMLData.csv").as_posix(),
+    Path("/midrc-etl/mlanalysis/baseMLData.csv").as_posix(),
 )
 
 # read CSV files
-data_file = Path("/midrc-etl/mlAnalysis/baseMLData.csv").as_posix()
+data_file = Path("/midrc-etl/mlanalysis/baseMLData.csv").as_posix()
 base_mdata = pd.read_csv(data_file, sep="\t", header=0, dtype=str)
 
 # All data analysis will be done in relativity to the manufacturer, thus we must drop rows with that column empty

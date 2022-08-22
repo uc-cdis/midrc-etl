@@ -27,11 +27,11 @@ src_bucket = s3.Bucket(SRC_BUCKET)
 s3.meta.client.download_file(
     "processing-data-midrc-replication",
     args.name + "/" + "cleanedData.csv",
-    Path("/midrc-etl/mlAnalysis/cleanedData.csv").as_posix(),
+    Path("/midrc-etl/mlanalysis/cleanedData.csv").as_posix(),
 )
 
 # Reading cleaned data
-data_file = "/midrc-etl/mlAnalysis/cleanedData.csv"
+data_file = "/midrc-etl/mlanalysis/cleanedData.csv"
 data = pd.read_csv(data_file)
 
 # pixel spacing is a string object as a default so to convert the data into a graphable form we must convert the string

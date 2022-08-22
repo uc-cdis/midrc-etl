@@ -63,5 +63,5 @@ dataset.to_csv("convertedData.csv")
 s3.meta.client.upload_file(
     "convertedData.csv",
     "external-data-midrc-replication",
-    (args.name / "convertedData.csv"),
+    Path(args.name / "convertedData.csv").as_posix(),
 )

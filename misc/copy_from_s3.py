@@ -24,7 +24,8 @@ def copy_file(
     dst_key: str,
 ):
     copy_source = {"Bucket": src_bucket, "Key": src_key}
-    dst_bucket.copy(copy_source, dst_key)
+    dst_bucket_obj = s3.Bucket(dst_bucket)
+    dst_bucket_obj.copy(copy_source, dst_key)
 
 
 def move_file(
@@ -143,9 +144,6 @@ def main(args):
 
     manifest = read_manifest(args.manifest)
     func = partial(command, s3=s3, src_bucket=args.src, dst_bucket=args.dest)
-    print(func)
-
-    func(src_key="3", dst_key="4")
 
     run_command(func, manifest, args.num_workers)
 

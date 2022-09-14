@@ -1,0 +1,24 @@
+metadata:
+  generateName: a
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      container:
+        name: pod
+        image: "quay.io/cdis/midrc-etl:v3"
+        imagePullPolicy: Always
+        command:
+          - bash
+          - -c
+        args:
+          - echo "start";
+            python ./notification/slack.py;
+            echo "end";
+        env:
+          - name: HOOKURL
+            valueFrom:
+              secretKeyRef:
+                name: argo-webhook-url
+                key: webhook-url

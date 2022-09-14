@@ -1,0 +1,45 @@
+metadata:
+  name: acrsubm
+  namespace: argo
+spec:
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: submission
+            value: '{{workflow.parameters.submission}}'
+          - name: s3key
+            value: '{{workflow.parameters.s3key}}'
+          - name: inputdir
+            value: '{{workflow.parameters.inputdir}}'
+      outputs: {}
+      metadata: {}
+      container:
+        name: midrcpod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+          - bash
+          - '-c'
+        args:
+          - >-
+            mkdir -p /midrc-data/{{inputs.parameters.submission}};  echo "RUNNING
+            SCRIPT 1"; poetry run python /midrc-etl/notification/slackDataIngestionStepStart.py; poetry run python /midrc-etl/v3/process_acr_submission.py
+            --submission {{inputs.parameters.submission}} --input_path /midrc-data --output_path
+            /midrc-data/{{inputs.parameters.submission}}/output --new --s3key {{inputs.parameters.s3key}}; echo "SCRIPT 1 HAS RUN"; poetry run python /midrc-etl/notification/slackDataIngestionStepDone.py; echo
+            "RUNNING SCRIPT 2"; poetry run python /midrc-etl/notification/slackDataIngestionStepStart.py; poetry run python
+            /midrc-etl/v3/package_series.py --input_directory {{inputs.parameters.inputdir}}; echo "SCRIPT 2 HAS RUN"; poetry run python /midrc-etl/notification/slackDataIngestionStepDone.py; echo
+            "LISTING FILES IN DIRECTORY"; cd /midrc-data/{{inputs.parameters.submission}}/output;
+            ls; echo "END OF WORKFLOW"; poetry run python /midrc-etl/notification/slackDataIngestionDone.py;
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: submission
+        value: "ACR_20220415"
+      - name: s3key
+        value: 'replicated-data-acr/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv'
+      - name: inputdir
+        value: '/midrc-data/ACR_20220415/output'

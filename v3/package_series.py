@@ -2,6 +2,7 @@
 Packaging script
 """
 
+import argparse
 import csv
 import json
 import zipfile
@@ -9,6 +10,7 @@ import os
 from collections import defaultdict
 from hashlib import md5
 from io import BytesIO
+
 
 import boto3
 from pqdm.threads import pqdm
@@ -23,7 +25,19 @@ dst_bucket = s3.Bucket(DST_BUCKET)
 
 series = defaultdict(list)
 
-FOLDER = "/home/ubuntu/wd/output/RSNA_20220308"
+# s3://external-data-midrc-replication/replicated-data-acr/ACR_20211115/clinical_manifestfile_ACR_20211115.tsv
+
+parser = argparse.ArgumentParser(description="Package Series Files")
+parser.add_argument(
+    "--input_directory",
+    action="store",
+    type=str,
+    required=True,
+    help="Directory for Series files",
+)
+args = parser.parse_args()
+
+# FOLDER = "/midrc-data/ACR_20220415/output"
 # FOLDER = "./packages_acrimage/2021/09"
 # FOLDER = "./packages_acrimage/2021/0827"
 
@@ -70,7 +84,9 @@ def process_package_file(package_file):
 
     files_metadata = []
     files = []
-    with open(FOLDER + "/" + package_file, encoding="utf8") as series_file:
+    with open(
+        args.input_directory + "/" + package_file, encoding="utf8"
+    ) as series_file:
         reader = csv.DictReader(series_file, delimiter="\t")
 
         # file_name	file_size	md5sum	case_id	study_uid	series_id	storage_urls
@@ -110,7 +126,9 @@ def process_package_file(package_file):
     dst_bucket.Object(zip_url).upload_fileobj(zip_obj)
 
     with open(
-        FOLDER + "/packages/{}.txt".format(series_id), "w", encoding="utf8"
+        args.input_directory + "/packages/{}.txt".format(series_id),
+        "w",
+        encoding="utf8",
     ) as tsv_result_file:
         fieldnames = [
             "record_type",
@@ -146,12 +164,12 @@ def main():
 
 if __name__ == "__main__":
     package_files = []
-    with open(FOLDER + "/packages.txt", encoding="utf8") as cases_file:
+    with open(args.input_directory + "/packages.txt", encoding="utf8") as cases_file:
         for line in cases_file.readlines():
             line = line.strip()
             package_files.append(line)
             # break
 
-    os.makedirs(FOLDER + "/packages", exist_ok=True)
+    os.makedirs(args.input_directory + "/packages", exist_ok=True)
 
     result = pqdm(package_files, process_package_file, n_jobs=6)

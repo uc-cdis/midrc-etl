@@ -1,0 +1,158 @@
+metadata:
+  generateName: mltestwf
+  namespace: argo
+spec:
+  podMetadata:
+        annotations:
+          gen3username: "osdominguez@uchicago.edu"
+  entrypoint: main
+  templates:
+    - name: download
+      container:
+        name: downloadPod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
+        args:
+            - poetry run python /midrc-etl/mlanalysis/download.py --name {{workflow.name}};
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+
+    - name: cleaning
+      container:
+        name: cleaningPod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
+        args:
+            - poetry run python /midrc-etl/mlanalysis/cleaning.py --name {{workflow.name}};
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+
+    - name: conversion
+      container:
+        name: conversionPod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
+        args:
+            - poetry run python /midrc-etl/mlanalysis/conversion.py --name {{workflow.name}};
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+
+    - name: model1
+      container:
+        name: ml1Pod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
+        args:
+            - poetry run python /midrc-etl/mlanalysis/mlmodel1.py --name {{workflow.name}};
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+
+    - name: model2
+      container:
+        name: ml2Pod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
+        args:
+            - poetry run python /midrc-etl/mlanalysis/mlmodel2.py --name {{workflow.name}};
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+
+    - name: model3
+      container:
+        name: ml3Pod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
+        args:
+            - poetry run python /midrc-etl/mlanalysis/mlmodel3.py --name {{workflow.name}};
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+
+    - name: model4
+      container:
+        name: ml4Pod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
+        args:
+            - poetry run python /midrc-etl/mlAnalysis/mlmodel4.py --name {{workflow.name}};
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+
+    - name: compare
+      container:
+        name: comparePod
+        image: 'quay.io/cdis/midrc-etl:v3'
+        command:
+            - bash
+            - '-c'
+        args:
+            - poetry run python /midrc-etl/mlAnalysis/compare.py --name {{workflow.name}};
+        resources: {}
+        imagePullPolicy: Always
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+
+    - name: main
+      dag:
+        tasks:
+        - name: Download
+          template: download
+
+        - name: Cleaning
+          depends: "Download"
+          template: cleaning
+
+        - name: Conversion
+          depends: "Cleaning"
+          template: conversion
+
+        - name: MLM1
+          depends: "Conversion"
+          template: model1
+
+        - name: MLM2
+          depends: "Conversion"
+          template: model2
+
+        - name: MLM3
+          depends: "Conversion"
+          template: model3
+
+        - name: MLM4
+          depends: "Conversion"
+          template: model4
+
+        - name: Compare
+          depends: "MLM1 && MLM2 && MLM3 && MLM4"
+          template: compare
+
+      serviceAccountName: data-midrc-org-s3-full-access-serviceaccount
+      automountServiceAccountToken: true
+  arguments: {}

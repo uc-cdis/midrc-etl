@@ -1,154 +1,97 @@
 #!/usr/bin/env python3
 
-import atexit
-import base64
+import argparse
 import json
+import logging
 import os
 import os.path
 import sys
 import time
 from datetime import datetime
-from multiprocessing.pool import ThreadPool
+from functools import partial
+from urllib.parse import urlparse, urlunparse
 
 import boto3
-import httplib2
 import jwt
 import requests
-from botocore.exceptions import ClientError
-
-
-msg = ""
-
-
-def exit_handler():
-    with open("last.txt", "w") as f:
-        if msg:
-            f.writelines([msg, "\n"])
-
-
-atexit.register(exit_handler)
-
-print(sys.argv)
-
-if len(sys.argv) != 7 and len(sys.argv) != 9:
-    print(
-        """
-Sample script to recursively import in Orthanc all the DICOM files
-that are stored in some path. Please make sure that Orthanc is running
-before starting this script. The files are uploaded through the REST
-API.
-
-Use "--s3" if the data is in S3, otherwise the script defaults to local data.
-
-Usage: %s [hostname] [DICOM server endpoint] [path to data] [path to API key] <--s3> <files.lst>
-Usage: %s [hostname] [DICOM server endpoint] [path to data] [path to API key] [username] [password] <--s3> <files.lst>
-For instance: %s qa-midrc.planx-pla.net dicom-server ./my-files/ ./credentials.json
-"""
-        % (sys.argv[0], sys.argv[0], sys.argv[0])
-    )
-    exit(-1)
+from pqdm.threads import pqdm
 
 POOL_SIZE = 6
-URL = f"https://{sys.argv[1]}/{sys.argv[2]}/instances/"
+TOKEN = None
+TOKEN_EXP = None
 
-dicom_count = 0
-non_dicom_count = 0
-total_file_count = 0
-token = None
-token_exp = None
-basic_auth = None
+parser = argparse.ArgumentParser(description="Import S3 data to DICOM Server")
+parser.add_argument(
+    "--dicom-server-endpoint",
+    action="store",
+    type=str,
+    required=True,
+    help="DICOM Server endpoint",
+)
+parser.add_argument(
+    "--credentials",
+    action="store",
+    type=str,
+    required=True,
+    help="Path to file with credentials",
+)
+parser.add_argument(
+    "--filelist",
+    action="store",
+    type=str,
+    required=True,
+    help="Path to file with list of files to submit",
+)
+args = parser.parse_args()
+
+logging.basicConfig(
+    level=logging.INFO,
+    filename="app.log",
+    filemode="w",
+    format="%(name)s - %(levelname)s - %(message)s",
+)
 
 
-class Timer:
-    def __init__(self, name=None, message="Elapsed time: {:0.2f} seconds ({})") -> None:
-        self.name = name
-        self._start_time = None
-        self.message = message
-
-    def start(self) -> None:
-        if self._start_time is None:
-            self._start_time = time.perf_counter()
-        else:
-            raise Exception("Timer already started. Stop it first using .stop()")
-
-    def stop(self) -> None:
-        if self._start_time is None:
-            raise Exception("Timer is not running. Start it first using .start()")
-        else:
-            elapsed_time = time.perf_counter() - self._start_time
-            self._start_time = None
-            print(self.message.format(elapsed_time, self.name))
+def read_token(credentials_file):
+    with open(credentials_file, "r") as f:
+        creds = json.load(f)
+    return creds
 
 
-def get_token(h):
-    global token
-    global token_exp
-    if not token or not token_exp or token_exp < time.time():
-        api_key_path = sys.argv[4]
-        print(f"Attempting to get a new token with API key at {api_key_path}")
-        with open(api_key_path, "r") as f:
-            creds = json.load(f)
-        token_url = f"https://{sys.argv[1]}/user/credentials/api/access_token"
-        resp = requests.post(token_url, json=creds)
+def get_token(access_token_url, credentials):
+    """
+    Get the access token.
+    """
+    global TOKEN
+    global TOKEN_EXP
+    if not TOKEN or not TOKEN_EXP or TOKEN_EXP < time.time():
+        resp = requests.post(access_token_url, json=credentials)
         if resp.status_code != 200:
-            print(f"Unable to get access token: {resp.text}")
+            logging.error("Unable to get access token: %s", resp.text)
             raise Exception(resp.reason)
-        token = resp.json()["access_token"]
-        token_exp = jwt.decode(token, verify=False)["exp"]
-    return token
+        TOKEN = resp.json()["access_token"]
+        TOKEN_EXP = jwt.decode(TOKEN, verify=False)["exp"]
+    return TOKEN
 
 
-def get_basic_auth():
-    global basic_auth
-    if not basic_auth:
-        username = sys.argv[5]
-        password = sys.argv[6]
-        creds_str = username + ":" + password
+def upload_file(
+    dicom_server_endpoint, access_token_endpoint, credentials, bucket, filekey
+):
+    filebody = bucket.Object(key=filekey).get()["Body"].read()
 
-        print(creds_str)
-
-        creds_str_bytes = creds_str.encode("ascii")
-        creds_str_bytes_b64 = b"Basic " + base64.b64encode(creds_str_bytes)
-        basic_auth = creds_str_bytes_b64.decode("ascii")
-    return basic_auth
-
-
-# This function will upload a single file to Orthanc through the REST API
-def upload_file(file_name, content):
-    global dicom_count
-    global non_dicom_count
-    global total_file_count
-    global msg
-
-    total_file_count += 1
-
-    timer = Timer(file_name)
-    timer.start()
-
-    if not file_name.lower().endswith(".dcm"):
-        sys.stdout.write(f" => ignored non-DICOM file {file_name}\n")
-        non_dicom_count += 1
+    if not filekey.lower().endswith(".dcm"):
+        logging.error("non-DICOM file: %s", filekey)
         return
 
-    h = httplib2.Http()
-    headers = {"content-type": "application/dicom"}
-
-    if len(sys.argv) == 9:  # use basic auth instead of token
-        headers["authorization"] = get_basic_auth()
-    else:
-        headers["authorization"] = f"bearer {get_token(h)}"
+    headers = {"Content-Type": "Application/DICOM"}
+    headers["Authorization"] = f"Bearer {get_token(access_token_endpoint, credentials)}"
 
     try:
-        msg = f"{total_file_count}\t{file_name}"
-        resp, content = h.request(URL, "POST", body=content, headers=headers)
-
-        if resp.status == 200:
-            sys.stdout.write(f" => success ({file_name})\n")
-            dicom_count += 1
+        resp = requests.post(dicom_server_endpoint, data=filebody, headers=headers)
+        if resp.status_code == 200:
+            logging.info("success %s", filekey)
         else:
-            sys.stdout.write(
-                f" => failure ({file_name}) (Is it a DICOM file? Is there a password?) Details: {resp}\n"
-            )
+            logging.error("%s: %s %s", filekey, resp.status_code, resp.reason)
 
     except Exception as e:
         type, value, traceback = sys.exc_info()
@@ -158,26 +101,11 @@ def upload_file(file_name, content):
             f" => unable to connect (Is Orthanc running? Is there a password?) Details: {e}\n"
         )
 
-    timer.stop()
-
-
-def upload_from_s3(filekey, filebody):
-    upload_file(filekey, filebody)
-
-
-def upload_from_local(path):
-    ROOT_DIR = os.path.abspath(sys.argv[3])
-
-    file_path = os.path.join(ROOT_DIR, path)
-    with open(file_path, "rb") as f:
-        content = f.read()
-        upload_file(file_path, content)
-
 
 def send_webhook(message):
     webhook_url = os.getenv("SLACK_WEBHOOK_URL")
     if webhook_url:
-        response = requests.post(
+        _ = requests.post(
             webhook_url,
             json={
                 "text": message,
@@ -185,85 +113,48 @@ def send_webhook(message):
         )
 
 
-if __name__ == "__main__":
-    place = None
-    if os.path.exists("last.txt"):
-        with open("last.txt") as f:
-            place = f.readlines()[0].strip().split("\t")[1]
-            last_filename = place.split("\t")[-1]
-            print(f"skipping until {last_filename}")
+def main(args):
+    """
+    Entrypoint for the script.
+    """
+    parsed_url = urlparse(args.dicom_server_endpoint)
+
+    access_token_endpoint = urlunparse(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            "/user/credentials/api/access_token",
+            "",
+            "",
+            "",
+        )
+    )
+
+    credentials = read_token(args.credentials)
 
     start = datetime.now()
-    message = f"started submission of {sys.argv[-1]} at {start.isoformat()}"
+    message = f"started submission of {args.filelist} at {start.isoformat()}"
     send_webhook(message=message)
 
-    p = ThreadPool(POOL_SIZE)
-    timer_all = Timer("Uploading all files")
-    timer_all.start()
+    s3_resource = boto3.resource("s3")
+    bucket = s3_resource.Bucket("external-data-midrc-replication")
 
-    if "--s3" in sys.argv:
-        # with open("config.yml", "rt", encoding="utf8") as ymlfile:
-        #     cfg = yaml.safe_load(ymlfile)
+    files = []
 
-        # AWS_ACCESS_KEY_ID = cfg["aws"]["access_key"]
-        # AWS_ACCESS_SECRET_ACCESS_KEY = cfg["aws"]["secret_key"]
-        # AWS_STORAGE_BUCKET_NAME = cfg["aws"]["bucket"]
+    with open(args.filelist, "r") as list_of_files:
+        for line in list_of_files.readlines():
+            line = line.strip()
+            files.append(line)
 
-        s3_resource = boto3.resource(
-            "s3",
-            # aws_access_key_id=AWS_ACCESS_KEY_ID,
-            # aws_secret_access_key=AWS_ACCESS_SECRET_ACCESS_KEY,
-        )
-        # bucket = s3_resource.Bucket(AWS_STORAGE_BUCKET_NAME)
-        bucket = s3_resource.Bucket("external-data-midrc-replication")
+    upload = partial(
+        upload_file,
+        args.dicom_server_endpoint,
+        access_token_endpoint,
+        credentials,
+        bucket,
+    )
 
-        skip = False
-        if place:
-            skip = True
-
-        with open(sys.argv[-1]) as list_of_files:
-            for line in list_of_files.readlines():
-                if place and line.strip() == place.strip():
-                    skip = False
-
-                if skip:
-                    continue
-
-                file = bucket.Object(key=line.strip())
-                try:
-                    p.apply(
-                        upload_from_s3,
-                        (
-                            line.strip(),
-                            file.get()["Body"].read(),
-                        ),
-                    )
-                except ClientError as ex:
-                    if ex.response["Error"]["Code"] == "NoSuchKey":
-                        print(f"object not found: line.strip()")
-                    else:
-                        pass
-
-        # files_collection = bucket.objects.filter(Prefix=sys.argv[3]).all()
-        # for file in files_collection:
-        #     p.map(upload_from_s3, file)
-    else:
-        for root, _, files in os.walk(sys.argv[3]):
-            p.map(upload_from_local, files)
-
-    timer_all.stop()
-
-    if dicom_count + non_dicom_count == total_file_count:
-        print(f"\nSUCCESS: {dicom_count} DICOM file(s) have been successfully imported")
-    else:
-        print(
-            f"\nWARNING: Only {dicom_count} out of {total_file_count - non_dicom_count} file(s) have been successfully imported as DICOM instance(s)"
-        )
-
-    if non_dicom_count != 0:
-        print(f"NB: {non_dicom_count} non-DICOM file(s) have been ignored")
-
-    print("")
+    _ = pqdm(files, upload, n_jobs=POOL_SIZE)
 
     end = datetime.now()
     duration = end - start
@@ -273,5 +164,15 @@ if __name__ == "__main__":
     hours = divmod(duration_in_s, 3600)[0]
     minutes = divmod(duration_in_s, 60)[0]
 
-    message = f"ended submission of {sys.argv[-1]} at {end.isoformat()}\nruntime:\n\tdays: {days}\n\thours: {hours}\n\tminutes: {minutes}\n\tseconds: {duration_in_s}\n\t"
+    message = f"""ended submission of {args.filelist} at {end.isoformat()}
+runtime:
+    days: {days}
+    hours: {hours}
+    minutes: {minutes}
+    seconds: {duration_in_s}
+"""
     send_webhook(message=message)
+
+
+if __name__ == "__main__":
+    main(args)

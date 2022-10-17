@@ -1,8 +1,0 @@
-conversion/*
-etl/*
-misc/*
-notebooks/*
-v2/*
-workflow/*
-poetry.lock
-pyproject.toml

@@ -92,8 +92,8 @@ open_input="/home/ubuntu/wd/output/${batch}/to_index/packages_open_${batch}.tsv"
 open_output="/home/ubuntu/wd/output/${batch}/to_index/packages_open_${batch}.tsv"
 seq_input="/home/ubuntu/wd/output/${batch}/to_index/packages_seq_${batch}.tsv"
 seq_output="/home/ubuntu/wd/output/${batch}/to_index/packages_seq_${batch}.tsv"
-ocred = "/home/ubunutu/wd/creds/midrc-staging-credentials.json"
-vcred = "/home/ubunutu/wd/creds/midrc-validate-credentials.json"
+ocred = "/home/ubuntu/wd/creds/midrc-staging-credentials.json"
+vcred = "/home/ubuntu/wd/creds/midrc-validate-credentials.json"
 
 mkdir -p /home/ubuntu/wd/output/${batch}/indexed
 
@@ -117,7 +117,7 @@ python3 ${script} --batch_dir ${batch_dir} --destination open
 python3 ${script} --batch_dir ${batch_dir} --destination seq
 
 """
-# copy the script
+# upload the script to the VM
 scp /Users/christopher/Documents/Notes/MIDRC/packaging/scripts/copy_from_s3.py utilityvm.midrc.csoc:/home/ubuntu/wd/scripts/
 
 script="/home/ubuntu/wd/scripts/copy_from_s3.py"

@@ -8,7 +8,9 @@ from pathlib import Path
 
 import boto3, tqdm
 
-parser = argparse.ArgumentParser(description="Move package files to their respective buckets")
+parser = argparse.ArgumentParser(
+    description="Move package files to their respective buckets"
+)
 parser.add_argument(
     "--batch_dir",
     action="store",
@@ -35,13 +37,14 @@ args=Args()
 
 """
 
+
 def copy_file(
     s3: boto3.session.Session.resource, src_bucket: str, dst_bucket: str, key: str
 ):
     if args.destination == "open":
         key = key.replace("s3://open-data-midrc/", "")
     elif args.destination == "seq":
-        key = key.replace("s3://sequestered-data-midrc/","")
+        key = key.replace("s3://sequestered-data-midrc/", "")
     copy_source = {"Bucket": src_bucket, "Key": key}
     bucket.copy(copy_source, key)
 
@@ -51,15 +54,25 @@ s3 = boto3.resource("s3")
 SRC_BUCKET = "internal-data-midrc-replication"
 
 ## create input file
-batch = args.batch_dir.split('/')[-1]
-print("Processing batch '{}' in directory '{}'.".format(batch,args.batch_dir))
+batch = args.batch_dir.split("/")[-1]
+print("Processing batch '{}' in directory '{}'.".format(batch, args.batch_dir))
 
-index_manifest = Path("{}/indexed/indexed_packages_open_{}.tsv".format(args.batch_dir,batch))
-assert(index_manifest.is_file()), "Couldn't find the input index manifest file: {}".format(index_manifest)
+index_manifest = Path(
+    "{}/indexed/indexed_packages_{}_{}.tsv".format(
+        args.destination, args.batch_dir, batch
+    )
+)
+assert (
+    index_manifest.is_file()
+), "Couldn't find the input index manifest file: {}".format(index_manifest)
 
-df = pd.read_csv(index_manifest,sep='\t',header=0)
+df = pd.read_csv(index_manifest, sep="\t", header=0)
 files_to_download = list(set(df.urls))
-print("Total of {} package files found in index manifest file:\n\t{}".format(len(df),index_manifest))
+print(
+    "Total of {} package files found in index manifest file:\n\t{}".format(
+        len(df), index_manifest
+    )
+)
 
 if args.destination == "open":
     DST_BUCKET = "open-data-midrc"
@@ -69,7 +82,7 @@ elif args.destination == "seq":
 bucket = s3.Bucket(DST_BUCKET)
 func = partial(copy_file, s3, SRC_BUCKET, DST_BUCKET)
 
-failed_downloads = [] # possible failed downloads to retry later
+failed_downloads = []  # possible failed downloads to retry later
 with tqdm.tqdm(desc="Copying...", total=len(files_to_download)) as pbar:
     with ThreadPoolExecutor(max_workers=16) as executor:
         # Using a dict for preserving the downloaded file for each future, to store it as a failure if we need that

@@ -59,7 +59,7 @@ print("Processing batch '{}' in directory '{}'.".format(batch, args.batch_dir))
 
 index_manifest = Path(
     "{}/indexed/indexed_packages_{}_{}.tsv".format(
-        args.destination, args.batch_dir, batch
+        args.batch_dir, args.destination, batch
     )
 )
 assert (

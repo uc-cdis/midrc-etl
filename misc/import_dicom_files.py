@@ -10,13 +10,15 @@ import time
 from datetime import datetime
 from functools import partial
 from urllib.parse import urlparse, urlunparse
+from datetime import datetime
+from botocore.exceptions import ClientError
 
 import boto3
 import jwt
 import requests
 from pqdm.threads import pqdm
 
-POOL_SIZE = 6
+POOL_SIZE = 1
 TOKEN = None
 TOKEN_EXP = None
 
@@ -46,7 +48,7 @@ args = parser.parse_args()
 
 logging.basicConfig(
     level=logging.INFO,
-    filename="app.log",
+    filename="app_{:%Y-%m-%dT%H-%M-%S}.log".format(datetime.now()),
     filemode="w",
     format="%(name)s - %(levelname)s - %(message)s",
 )
@@ -70,36 +72,45 @@ def get_token(access_token_url, credentials):
             logging.error("Unable to get access token: %s", resp.text)
             raise Exception(resp.reason)
         TOKEN = resp.json()["access_token"]
-        TOKEN_EXP = jwt.decode(TOKEN, verify=False)["exp"]
+        TOKEN_EXP = jwt.decode(TOKEN, options={"verify_signature": False})["exp"]
     return TOKEN
 
 
 def upload_file(
     dicom_server_endpoint, access_token_endpoint, credentials, bucket, filekey
 ):
-    filebody = bucket.Object(key=filekey).get()["Body"].read()
-
-    if not filekey.lower().endswith(".dcm"):
-        logging.error("non-DICOM file: %s", filekey)
-        return
-
-    headers = {"Content-Type": "Application/DICOM"}
-    headers["Authorization"] = f"Bearer {get_token(access_token_endpoint, credentials)}"
-
     try:
-        resp = requests.post(dicom_server_endpoint, data=filebody, headers=headers)
-        if resp.status_code == 200:
-            logging.info("success %s", filekey)
-        else:
-            logging.error("%s: %s %s", filekey, resp.status_code, resp.reason)
+        filebody = bucket.Object(key=filekey).get()["Body"].read()
 
-    except Exception as e:
-        type, value, traceback = sys.exc_info()
-        sys.stderr.write(str(e))
-        sys.stderr.write(str(value))
-        sys.stdout.write(
-            f" => unable to connect (Is Orthanc running? Is there a password?) Details: {e}\n"
-        )
+        if not filekey.lower().endswith(".dcm"):
+            logging.error("non-DICOM file: %s", filekey)
+            return
+
+        headers = {"Content-Type": "Application/DICOM"}
+        headers[
+            "Authorization"
+        ] = f"Bearer {get_token(access_token_endpoint, credentials)}"
+
+        try:
+            resp = requests.post(dicom_server_endpoint, data=filebody, headers=headers)
+            if resp.status_code == 200:
+                logging.info("success %s", filekey)
+            else:
+                logging.error("%s: %s %s", filekey, resp.status_code, resp.reason)
+
+        except Exception as e:
+            type, value, traceback = sys.exc_info()
+            sys.stderr.write(str(e))
+            sys.stderr.write(str(value))
+            sys.stdout.write(
+                f" => unable to connect (Is Orthanc running? Is there a password?) Details: {e}\n"
+            )
+    except ClientError as ex:
+        if ex.response["Error"]["Code"] == "NoSuchKey":
+            logging.info(f"No object found: {filekey}")
+            return
+        else:
+            raise
 
 
 def send_webhook(message):

@@ -39,7 +39,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--new",
-    default=True,
+    default=False,
     action="store_true",
     help='for "new"-style submissions',
 )
@@ -161,9 +161,12 @@ def process_submission_old(submission, input_path, output_path):
         "mr_exams.submitter_id": "study_id",
         "ct_scans.submitter_id": "study_id",
         "radiography_exams.submitter_id": "study_id",
+        # "submitter_id": "study_id",
         "case_ids": "case_id",
         "series_uid": "series_id",
     }
+
+    print(series_files)
 
     series = list(
         map(
@@ -240,50 +243,56 @@ def process_submission_old(submission, input_path, output_path):
         ]
     ]
 
-    print(
-        f"image manifest: {image_manifest.shape}\nmerged manifest: {merged.shape}\nall instances: {all_instances.shape}"
+    merged.to_csv(
+        f"/Users/andrewprokhorenkov/Downloads/dicom_submission/{submission}.tsv",
+        sep="\t",
+        index=False,
     )
-    # print(f"image manifest: {image_manifest.columns}\nmerged manifest: {merged.columns}\nall instances: {all_instances.columns}")
-    # print(all_instances.head())
-    # print(image_manifest.head())
 
-    list_of_packages = []
+    # print(
+    #     f"image manifest: {image_manifest.shape}\nmerged manifest: {merged.shape}\nall instances: {all_instances.shape}"
+    # )
+    # # print(f"image manifest: {image_manifest.columns}\nmerged manifest: {merged.columns}\nall instances: {all_instances.columns}")
+    # # print(all_instances.head())
+    # # print(image_manifest.head())
 
-    for _, row in merged.iterrows():
-        case_id = row["case_id"]
-        study_id = row["study_id"]
-        series_id = row["series_id"]
+    # list_of_packages = []
 
-        series_path = f"./cases/{case_id}/{study_id}/{series_id}.tsv\n"
-        if series_path not in list_of_packages:
-            list_of_packages.append(series_path)
+    # for _, row in merged.iterrows():
+    #     case_id = row["case_id"]
+    #     study_id = row["study_id"]
+    #     series_id = row["series_id"]
 
-        folder = packages_path / "cases" / case_id / study_id
+    #     series_path = f"./cases/{case_id}/{study_id}/{series_id}.tsv\n"
+    #     if series_path not in list_of_packages:
+    #         list_of_packages.append(series_path)
 
-        folder.mkdir(parents=True, exist_ok=True)
+    #     folder = packages_path / "cases" / case_id / study_id
 
-        series_file = folder / f"{series_id}.tsv"
-        series_file_exist = series_file.exists()
+    #     folder.mkdir(parents=True, exist_ok=True)
 
-        with open(series_file, mode="a") as f:
-            fieldnames = [
-                "file_name",
-                "file_size",
-                "md5sum",
-                "case_id",
-                "study_id",
-                "series_id",
-                "instance_id",
-                "storage_urls",
-            ]
-            writer = csv.DictWriter(f, delimiter="\t", fieldnames=fieldnames)
+    #     series_file = folder / f"{series_id}.tsv"
+    #     series_file_exist = series_file.exists()
 
-            if not series_file_exist:
-                writer.writeheader()
-            writer.writerow(row.to_dict())
+    #     with open(series_file, mode="a") as f:
+    #         fieldnames = [
+    #             "file_name",
+    #             "file_size",
+    #             "md5sum",
+    #             "case_id",
+    #             "study_id",
+    #             "series_id",
+    #             "instance_id",
+    #             "storage_urls",
+    #         ]
+    #         writer = csv.DictWriter(f, delimiter="\t", fieldnames=fieldnames)
 
-    with open(packages_path / "packages.txt", "w") as f:
-        f.writelines(list_of_packages)
+    #         if not series_file_exist:
+    #             writer.writeheader()
+    #         writer.writerow(row.to_dict())
+
+    # with open(packages_path / "packages.txt", "w") as f:
+    #     f.writelines(list_of_packages)
 
 
 if __name__ == "__main__":

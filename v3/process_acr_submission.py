@@ -1,6 +1,5 @@
 import argparse
 import csv
-from email.mime import image
 import locale
 from itertools import chain
 from pathlib import Path
@@ -10,10 +9,17 @@ import pandas as pd
 import os
 import boto3
 
-# locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
-
-s3 = boto3.resource("s3")
+# download file
 # s3://external-data-midrc-replication/replicated-data-acr/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv
+#      ^ bucket                        ^ actual path we care (key)
+# into specific folder
+# let's say
+# /midrc-data/ACR_20220415/image_file_object_manifest_ACR_20220415.tsv
+#
+# python3 process_acr_submission.py --submission ACR_20220415 --input_path /midrc-data --output_path /midrc-data/ACR_20220415/output
+# python3 process_acr_submission.py --submission $SUBMISSION --input_path $INPUT_PATH --output_path $OUTPUT_PATH
+
+locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 
 parser = argparse.ArgumentParser(description="Process ACR submission")
 parser.add_argument(
@@ -111,6 +117,15 @@ def process_submission_new(submission, input_path, output_path):
 
         series_file = folder / f"{series_id}.tsv"
         series_file_exist = series_file.exists()
+
+        url = row["storage_urls"]
+        url_parts = url.split("/")
+        # len_url_parts = len(url_parts)
+        # if len_url_parts != 6:
+        #     print(len(url_parts))
+        #     print(url_parts)
+
+        row["storage_urls"] = "/".join(list(map(url_parts.__getitem__, [0, 1, 3, 5])))
 
         with open(series_file, mode="a") as f:
             fieldnames = [

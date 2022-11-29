@@ -18,11 +18,12 @@ def create_archive(files: list[tuple[str, str]], archive_filename: str) -> None:
             last_modified = datetime.datetime.fromtimestamp(last_modified).timetuple()[
                 0:6
             ]
-            obj = open(filename, "rb").read()
-            zip_info = zipfile.ZipInfo(
-                filename=in_archive_filename, date_time=last_modified
-            )
-            zip_archive.writestr(zip_info, obj)
+            with open(filename, "rb") as f:
+                obj = f.read()
+                zip_info = zipfile.ZipInfo(
+                    filename=in_archive_filename, date_time=last_modified
+                )
+                zip_archive.writestr(zip_info, obj)
 
     with open(archive_filename, "wb") as f:
         f.write(archive_stream.getvalue())

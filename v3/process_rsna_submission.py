@@ -46,18 +46,25 @@ parser.add_argument(
 args = parser.parse_args()
 
 
+# for everything after and including RSNA_20220329
 def process_submission_new(submission, input_path, output_path):
     print(submission)
-    packages_path = Path(output_path) / submission
-    packages_path.mkdir(parents=True, exist_ok=True)
+    # packages_path = Path(output_path) / submission
+    # packages_path.mkdir(parents=True, exist_ok=True)
 
     submission_path = Path(input_path) / submission
 
-    image_manifest_file = list(submission_path.glob("imaging_data_manifest_*.tsv"))
-    assert (
-        len(image_manifest_file) == 1
-    ), "only one manifest should exist in the submission"
-    image_manifest_file = image_manifest_file[0]
+    image_manifest_file = list(
+        chain(
+            submission_path.glob("imaging_data_manifest_*.tsv"),
+            submission_path.glob("image_manifest_*.tsv"),
+        )
+    )
+    print(image_manifest_file)
+    # assert (
+    #     len(image_manifest_file) == 1
+    # ), "only one manifest should exist in the submission"
+    # image_manifest_file = image_manifest_file[0]
 
     rename_columns = {
         "case_ids": "case_id",
@@ -65,60 +72,88 @@ def process_submission_new(submission, input_path, output_path):
         "series_uid": "series_id",
     }
 
-    instances = pd.read_csv(image_manifest_file, sep="\t").rename(
-        columns=rename_columns
+    instances = map(
+        lambda v: pd.read_csv(v, sep="\t").rename(columns=rename_columns),
+        image_manifest_file,
     )
+    instances = pd.concat(instances, ignore_index=True).reset_index(drop=True)
+
+    # instances = pd.read_csv(image_manifest_file, sep="\t").rename(
+    #     columns=rename_columns
+    # )
     instances = instances.drop(columns=["acl", "modality"])
     instances["storage_urls"] = instances["storage_urls"].apply(
         lambda v: v.replace("s3://storage.ir.rsna.ai/", "")
     )
+
+    if submission == "RSNA_20220524":
+        instances["storage_urls"] = instances["storage_urls"].apply(
+            lambda v: v.replace("RSNA_20220520", "RSNA_20220524")
+        )
+
     instances["file_name"] = instances["file_name"].apply(lambda v: v.split("/")[-1])
     instances["instance_id"] = instances["file_name"].apply(lambda v: v.split("/")[-1])
 
-    list_of_packages = []
+    instances = instances[
+        [
+            "storage_urls",
+            "file_name",
+            "file_size",
+            "md5sum",
+            "case_id",
+            "study_id",
+            "series_id",
+            "instance_id",
+        ]
+    ].drop_duplicates()
 
-    for _, row in instances.iterrows():
-        case_id = row["case_id"]
-        study_id = row["study_id"]
-        series_id = row["series_id"]
+    instances.to_csv(f"{output_path}/instance_{submission}.csv", index=False)
 
-        series_path = f"./cases/{case_id}/{study_id}/{series_id}.tsv\n"
-        if series_path not in list_of_packages:
-            list_of_packages.append(series_path)
+    # list_of_packages = []
 
-        folder = packages_path / "cases" / case_id / study_id
+    # for _, row in instances.iterrows():
+    #     case_id = row["case_id"]
+    #     study_id = row["study_id"]
+    #     series_id = row["series_id"]
 
-        folder.mkdir(parents=True, exist_ok=True)
+    #     series_path = f"./cases/{case_id}/{study_id}/{series_id}.tsv\n"
+    #     if series_path not in list_of_packages:
+    #         list_of_packages.append(series_path)
 
-        series_file = folder / f"{series_id}.tsv"
-        series_file_exist = series_file.exists()
+    #     folder = packages_path / "cases" / case_id / study_id
 
-        with open(series_file, mode="a") as f:
-            fieldnames = [
-                "file_name",
-                "file_size",
-                "md5sum",
-                "case_id",
-                "study_id",
-                "series_id",
-                "instance_id",
-                "storage_urls",
-            ]
-            writer = csv.DictWriter(f, delimiter="\t", fieldnames=fieldnames)
+    #     folder.mkdir(parents=True, exist_ok=True)
 
-            if not series_file_exist:
-                writer.writeheader()
-            writer.writerow(row.to_dict())
+    #     series_file = folder / f"{series_id}.tsv"
+    #     series_file_exist = series_file.exists()
 
-    with open(packages_path / "packages.txt", "w") as f:
-        f.writelines(list_of_packages)
+    #     with open(series_file, mode="a") as f:
+    #         fieldnames = [
+    #             "file_name",
+    #             "file_size",
+    #             "md5sum",
+    #             "case_id",
+    #             "study_id",
+    #             "series_id",
+    #             "instance_id",
+    #             "storage_urls",
+    #         ]
+    #         writer = csv.DictWriter(f, delimiter="\t", fieldnames=fieldnames)
+
+    #         if not series_file_exist:
+    #             writer.writeheader()
+    #         writer.writerow(row.to_dict())
+
+    # with open(packages_path / "packages.txt", "w") as f:
+    #     f.writelines(list_of_packages)
 
 
+# for everything before (not including) RSNA_20220329
 def process_submission_old(submission, input_path, output_path):
     # useful paths for data manipulation
     print(submission)
-    packages_path = Path(output_path) / submission
-    packages_path.mkdir(parents=True, exist_ok=True)
+    # packages_path = Path(output_path) / submission
+    # packages_path.mkdir(parents=True, exist_ok=True)
 
     submission_path = Path(input_path) / submission
 
@@ -127,7 +162,12 @@ def process_submission_old(submission, input_path, output_path):
     image_manifest_file = list(submission_path.glob("imaging_data_manifest_*.tsv"))[0]
     studies_file = list(submission_path.glob("*imaging_study_*.tsv"))[0]
     series_files = list(submission_path.glob("*_series_*.tsv"))
-    instance_files = list(submission_path.glob("*_instance_*.tsv"))
+    instance_files = list(
+        chain(
+            submission_path.glob("*_instance_*.tsv"),
+            submission_path.glob("*_image_*.tsv"),
+        )
+    )
 
     # instance_files = list(SUBMISSION_PATH.glob("midrc_*_instance_*.tsv"))
     # instance_files = list(SUBMISSION_PATH.glob("midrc_*_image_*.tsv"))
@@ -139,6 +179,9 @@ def process_submission_old(submission, input_path, output_path):
     # load all files into pandas DF's
 
     image_manifest = pd.read_csv(image_manifest_file, sep="\t")
+    image_manifest["storage_urls"] = image_manifest["storage_urls"].str.replace(
+        "s3://storage.ir.rsna.ai/", "", regex=False
+    )
 
     studies = pd.read_csv(studies_file, sep="\t")
 
@@ -166,24 +209,35 @@ def process_submission_old(submission, input_path, output_path):
         "series_uid": "series_id",
     }
 
-    print(series_files)
-
-    series = list(
-        map(
-            lambda v: v.rename(columns=rename_columns_series)[
-                ["series_id", "study_id", "case_id"]
-            ],
-            series,
+    if submission == "midrc-ricord-2021-08-20":
+        series = list(
+            map(
+                lambda v: v.rename(columns=rename_columns_series)[
+                    ["series_id", "case_id"]
+                ],
+                series,
+            )
         )
-    )
+
+    else:
+        series = list(
+            map(
+                lambda v: v.rename(columns=rename_columns_series)[
+                    ["series_id", "study_id", "case_id"]
+                ],
+                series,
+            )
+        )
 
     all_series = pd.concat(series)
     all_series["case_id"] = all_series["case_id"].apply(
         lambda v: remove_prefix(v, "Case_")
     )
-    all_series["study_id"] = all_series["study_id"].apply(
-        lambda v: id_regex.search(v).group(0)
-    )
+
+    if submission != "midrc-ricord-2021-08-20":
+        all_series["study_id"] = all_series["study_id"].apply(
+            lambda v: id_regex.search(v).group(0)
+        )
 
     instances = list(map(lambda v: pd.read_csv(v, sep="\t"), instance_files))
 
@@ -192,6 +246,9 @@ def process_submission_old(submission, input_path, output_path):
         "dx_series.submitter_id": "series_id",
         "ct_series.submitter_id": "series_id",
         "mr_series.submitter_id": "series_id",
+        "dx_series": "series_id",
+        "ct_series": "series_id",
+        "cr_series": "series_id",
         "submitter_id": "instance_id",
         "case_ids": "case_id",
     }
@@ -225,29 +282,54 @@ def process_submission_old(submission, input_path, output_path):
 
     # fix for RSNA_20220314
     if submission == "RSNA_20220314":
-        all_instances["storage_urls"] = all_instances["storage_urls"].apply(
-            lambda v: v.replace("RSNA_20220307", "RSNA_20220314")
+        all_instances["storage_urls"] = all_instances["storage_urls"].str.replace(
+            "RSNA_20220307", "RSNA_20220314", regex=False
         )
 
-    merged = image_manifest.merge(all_instances).merge(all_series).merge(studies)
+    if submission == "midrc-ricord-2021-08-20":
+        rename_columns_image_manifest = {
+            "case_ids": "case_id",
+            "series_uid": "series_id",
+            "study_uid": "study_id",
+        }
+        image_manifest = image_manifest.rename(columns=rename_columns_image_manifest)
+        image_manifest["storage_urls"] = image_manifest["storage_urls"].str.replace(
+            "midrc-ricord-2021-08-10", "midrc-ricord-2021-08-20", regex=False
+        )
+        all_instances["storage_urls"] = all_instances["storage_urls"].str.replace(
+            "midrc-ricord-2021-08-10", "midrc-ricord-2021-08-20", regex=False
+        )
+
+    all_instances["storage_urls"] = all_instances["storage_urls"].str.replace(
+        "s3://storage.ir.rsna.ai/", "", regex=False
+    )
+
+    if submission == "midrc-ricord-2021-08-20":
+        merged = image_manifest.merge(all_instances)
+    else:
+        merged = image_manifest.merge(all_instances).merge(all_series).merge(studies)
+
     merged["file_name"] = merged["instance_id"].apply(lambda v: f"{v}.dcm")
     merged = merged[
         [
+            "storage_urls",
             "file_name",
             "file_size",
             "md5sum",
-            "storage_urls",
             "case_id",
             "study_id",
             "series_id",
+            "instance_id",
         ]
     ]
 
-    merged.to_csv(
-        f"/Users/andrewprokhorenkov/Downloads/dicom_submission/{submission}.tsv",
-        sep="\t",
-        index=False,
-    )
+    # merged.to_csv(
+    #     f"/Users/andrewprokhorenkov/Downloads/dicom_submission/{submission}.tsv",
+    #     sep="\t",
+    #     index=False,
+    # )
+
+    merged.to_csv(f"{output_path}/instance_{submission}.csv", index=False)
 
     # print(
     #     f"image manifest: {image_manifest.shape}\nmerged manifest: {merged.shape}\nall instances: {all_instances.shape}"

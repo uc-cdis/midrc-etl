@@ -58,7 +58,7 @@ def main():
 
     dataframe = pd.read_csv(
         crosswalk_file,
-        sep=",",
+        sep="|",
         header=0,
         low_memory=False,
         usecols=[query_attribute],
@@ -67,8 +67,8 @@ def main():
     create_output_file(crosswalk, output_path)
 
     files = [
-        (crosswalk_file, "MIDRC_N3C_UCHICAGO_20220728_TOKENS.csv"),
-        (output_path, "MIDRC_N3C_UCHICAGO_20220728_METADATA.csv"),
+        (crosswalk_file, "MIDRC_N3C_UCHICAGO_20230227_TOKENS.csv"),
+        (output_path, "MIDRC_N3C_UCHICAGO_20230227_METADATA.csv"),
     ]
     archive.create_archive(files, archive_path)
 

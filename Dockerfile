@@ -33,10 +33,10 @@ WORKDIR /$APPNAME
 # copy ONLY poetry artifact, install the dependencies only
 # this will make sure than the dependencies is cached
 COPY poetry.lock pyproject.toml /$APPNAME/
-RUN poetry install -vv --no-root --without dev \
+RUN poetry install -vv --no-root --no-dev \
     && poetry show -v
 
 # copy source code ONLY after installing dependencies
 COPY . /$APPNAME
-RUN poetry install -vv --without dev \
+RUN poetry install -vv --no-dev \
     && poetry show -v

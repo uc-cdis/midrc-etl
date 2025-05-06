@@ -20,7 +20,7 @@ gen3 = "^4.11.4"
 jsonobject = "^2.0.0"
 pyarrow = "^8.0.0"
 
-[tool.poetry.group.dev.dependencies]
+[tool.poetry.dev-dependencies]
 black = "^22.1.0"
 pycodestyle = "^2.8.0"
 pylint = "^2.12.2"

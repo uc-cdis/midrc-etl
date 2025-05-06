@@ -1,5 +1,3 @@
-import json
-import urllib.parse
 import boto3
 import paramiko
 import logging
@@ -31,28 +29,10 @@ SSH_DIR = os.getenv("SSH_DIR")
 SSH_FILENAME = os.getenv("SSH_FILENAME", "data_{current_date}")
 
 
-# def lambda_handler(event, context):
-#     print("Received event: " + json.dumps(event, indent=2))
-
-#     # Get the object from the event and show its content type
-#     bucket = event['Records'][0]['s3']['bucket']['name']
-#     key = urllib.parse.unquote_plus(event['Records'][0]['s3']['object']['key'], encoding='utf-8')
-#     try:
-#         response = s3.get_object(Bucket=bucket, Key=key)
-#         print("CONTENT TYPE: " + response['ContentType'])
-#         return response['ContentType']
-#     except Exception as e:
-#         print(e)
-#         print('Error getting object {} from bucket {}. Make sure they exist and your bucket is in the same region as this function.'.format(key, bucket))
-#         raise e
-
-
 def connect_to_sftp(hostname, port, username, password, pkey):
     """Connect to SFTP server and return client object."""
     transport = paramiko.Transport((hostname, port))
-    k = None
-    if pkey:
-        k = paramiko.RSAKey.from_private_key_file("/tmp/id_rsa")
+    k = paramiko.RSAKey.from_private_key_file(pkey) if pkey else None
     transport.connect(username=username, password=password, pkey=k)
     client = paramiko.SFTPClient.from_transport(transport)
     logger.debug(f"S3-SFTP: Connected to remote SFTP server")
@@ -75,14 +55,11 @@ def lambda_handler(event, context):
         event: dict, the event payload delivered by Lambda.
         context: a LambdaContext object - unused.
     """
+    private_key_path = "/tmp/id_rsa"
     if SSH_PRIVATE_KEY:
-        key_obj = SSH_PRIVATE_KEY
-        f = open("/tmp/id_rsa", "w")
-        f.write(key_obj)
+        f = open(private_key_path, "w")
+        f.write(SSH_PRIVATE_KEY)
         f.close()
-
-    else:
-        key_obj = None
 
     # prefix all logging statements - otherwise impossible to filter out in
     # Cloudwatch
@@ -93,7 +70,7 @@ def lambda_handler(event, context):
         port=SSH_PORT,
         username=SSH_USERNAME,
         password=SSH_PASSWORD,
-        pkey="/tmp/id_rsa",
+        pkey=private_key_path,
     )
     if SSH_DIR:
         sftp_client.chdir(SSH_DIR)

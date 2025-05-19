@@ -1,9 +1,10 @@
 import argparse
 import csv
 import os
-
+import re
 import archive
 import pandas as pd
+from datetime import datetime
 from gen3.auth import Gen3Auth
 from gen3.submission import Gen3Submission
 
@@ -66,10 +67,21 @@ def main():
     crosswalk = get_guids(dataframe, endpoint, creds, query_attribute)
     create_output_file(crosswalk, output_path)
 
+    crosswalk_file_regexp = r".*token_file_RSNA_(?P<dateFromFile>\d{8}).*"
+    match = re.match(crosswalk_file_regexp, crosswalk_file)
+    if match:
+        extracted_date = match.group("dateFromFile")
+    else:
+        print(
+            f"Crosswalk file expects the name to end with token_file_RSNA_YYYYMMDD, but found {crosswalk_file}. Falling back to current date"
+        )
+        extracted_date = datetime.now().strftime("%Y%m%d")
+
     files = [
-        (crosswalk_file, "MIDRC_N3C_UCHICAGO_20230227_TOKENS.csv"),
-        (output_path, "MIDRC_N3C_UCHICAGO_20230227_METADATA.csv"),
+        (crosswalk_file, f"MIDRC_N3C_UCHICAGO_{extracted_date}_TOKENS.csv"),
+        (output_path, f"MIDRC_N3C_UCHICAGO_{extracted_date}_METADATA.csv"),
     ]
+    print(f"Creating archive with filenames {[filename for (_,filename) in files]}")
     archive.create_archive(files, archive_path)
 
 
@@ -77,25 +89,25 @@ def get_guids(df, endpoint, creds, query_attribute):
     auth = Gen3Auth(endpoint, refresh_file=creds)
     sub = Gen3Submission(auth)
     query_string = """query($case_ids: [String]) {
-      datanode(
-        case_ids: $case_ids
-        type: "imaging_data_file"
-        first: 0
-      ) {
-        id
-        case_ids
-        object_id
-      }
+        datanode(
+            case_ids: $case_ids
+            type: "imaging_data_file"
+            first: 0
+        ) {
+            id
+            case_ids
+            object_id
+        }
     }"""
 
     cases_query = """query($submitter_id: [String]) {
-      case(
-        submitter_id: $submitter_id
-        first: 0
-    ) {
-        id
-        submitter_id
-      }
+        case(
+            submitter_id: $submitter_id
+            first: 0
+        ) {
+            id
+            submitter_id
+        }
     }"""
 
     crosswalk = []
@@ -104,11 +116,9 @@ def get_guids(df, endpoint, creds, query_attribute):
     case_data = sub.query(cases_query, {"submitter_id": cases})
     case_ids = {v["submitter_id"]: v["id"] for v in case_data["data"]["case"]}
 
-    n = 1
     print(len(case_ids))
-    for case, case_uuid in case_ids.items():
-        print(n)
-        n += 1
+    for n, (case, case_uuid) in enumerate(case_ids.items()):
+        print(n + 1)
         r = sub.query(query_string, {"case_ids": case})
         for i in r["data"]["datanode"]:
             crosswalk.append(

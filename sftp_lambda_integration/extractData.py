@@ -2,11 +2,11 @@ import argparse
 import csv
 import os
 import re
-import archive
 import pandas as pd
 from datetime import datetime
 from gen3.auth import Gen3Auth
 from gen3.submission import Gen3Submission
+import archive
 
 parser = argparse.ArgumentParser(description="N3C Crosswalk Packaging")
 parser.add_argument(
@@ -73,7 +73,7 @@ def main():
         extracted_date = match.group("dateFromFile")
     else:
         print(
-            f"Crosswalk file expects the name to end with token_file_RSNA_YYYYMMDD, but found {crosswalk_file}. Falling back to current date"
+            f"Crosswalk file expected to end with token_file_RSNA_YYYYMMDD, but found {crosswalk_file}. Falling back to current date"
         )
         extracted_date = datetime.now().strftime("%Y%m%d")
 

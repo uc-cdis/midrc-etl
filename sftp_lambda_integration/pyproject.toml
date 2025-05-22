@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "sftp_lambda_integration"
 version = "0.1.0"
-description = "ETL component for handling sFTP uploads and processing MIDRC response files"
+description = "Code related to Lambda trigger and SFTP upload integration"
 package-mode = false
 
 [tool.poetry.dependencies]

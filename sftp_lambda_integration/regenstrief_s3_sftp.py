@@ -10,7 +10,6 @@ from botocore.exceptions import BotoCoreError
 logger = logging.getLogger()
 logger.setLevel(os.getenv("LOGGING_LEVEL", "INFO"))
 
-s3 = boto3.client("s3")
 
 # read in shared properties on module load - will fail hard if any are missing
 SSH_HOST = os.environ["SSH_HOST"]

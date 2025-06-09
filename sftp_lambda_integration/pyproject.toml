@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "sftp_lambda_integration"
+version = "0.1.0"
+description = "Code related to Lambda trigger and SFTP upload integration"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "~3.9"
+pandas = "^1.4.2"
+gen3 = "^4.11.4"
+paramiko = "^3.5.1"
+boto3 = "^1.38.22"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.1.0"
+pycodestyle = "^2.8.0"
+pylint = "^2.12.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

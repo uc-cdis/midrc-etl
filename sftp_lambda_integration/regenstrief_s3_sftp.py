@@ -66,10 +66,15 @@ def lambda_handler(event, context):
 
     with transport:
         for s3_file in s3_files(event):
+            # Files are uploaded to the SSH_DIR (if set), or to the root directory of the SFTP server
+            filename = s3_file.key
 
-            # Get the current date in YYYYMMDD format
-            current_date = strftime("%Y_%m_%d")
-            filename = f"midrc_input/{current_date}/{s3_file.key}"
+            # Regenstrief limitations prevented creating date-based directories.
+            # Uncomment below to enable date-based folder structure if supported.
+
+            # current_date = strftime("%Y_%m_%d")
+            # filename = f"midrc_input/{current_date}/{s3_file.key}"
+
             try:
                 logger.info(f"S3-SFTP: Transferring S3 file '{filename}' to SFTP")
                 transfer_file(sftp_client, s3_file, filename)

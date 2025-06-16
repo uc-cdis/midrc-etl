@@ -65,6 +65,7 @@ def lambda_handler(event, context):
         logger.debug(f"S3-SFTP: Switched into remote SFTP upload directory")
 
     with transport:
+        transfer_failure = False
         for s3_file in s3_files(event):
             # Files are uploaded to the SSH_DIR (if set), or to the root directory of the SFTP server
             filename = s3_file.key
@@ -82,6 +83,12 @@ def lambda_handler(event, context):
                 logger.exception(
                     f"S3-SFTP: Error transferring S3 file '{filename}'.\nException: {ex}"
                 )
+                transfer_failure = True
+
+    if transfer_failure:
+        raise Exception(
+            "S3-SFTP: Transferring one or more files failed. Look the logs above for more information."
+        )
 
 
 def connect_to_sftp(hostname, port, username, password, pkey):

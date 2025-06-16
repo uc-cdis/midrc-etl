@@ -150,6 +150,7 @@ def create_dir_with_parents(sftp_client, remote_path):
             logger.debug(f"S3-SFTP: Created directory '{path}' on SFTP server")
         except OSError as ex:
             logger.debug(f"S3-SFTP: Directory '{path}' already exists on SFTP server.")
+            logger.debug(f"S3-SFTP: Exception: {ex}")
 
 
 def transfer_file(sftp_client, s3_file, remote_filename):

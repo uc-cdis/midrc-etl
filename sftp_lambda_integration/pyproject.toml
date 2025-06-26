@@ -5,10 +5,11 @@ description = "Code related to Lambda trigger and SFTP upload integration"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "~3.7"
+python = ">=3.7,<4"
 paramiko = "^3.5.1"
-boto3 = "^1.33.13"
-
+boto3 = ">=1.33,<2"
+pandas = "^1.1.5"
+gen3 = ">=4.9.4,<5"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.1.0"

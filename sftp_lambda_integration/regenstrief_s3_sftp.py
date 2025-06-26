@@ -28,17 +28,6 @@ def get_rsa_private_key_from_secrets(
         session = boto3.session.Session()
         client = session.client(service_name="secretsmanager", region_name=region_name)
         secret_string = client.get_secret_value(SecretId=secret_name)["SecretString"]
-        try:
-            # To parse multi-line text from a json formatted string, escape all `\n` with `\\n`
-            parsed_secret = json.loads(secret_string.replace("\n", "\\n"))
-        except json.JSONDecodeError:
-            raise ValueError(
-                "SecretString -- {} is not valid JSON.".format(secret_string)
-            )
-
-        logger.info("Fetching 'rsa_private_key' value from '{}'".format(secret_name))
-        rsa_private_key = parsed_secret.get("rsa_private_key")
-        return rsa_private_key
     except botocore.exceptions.ClientError as e:
         error_code = e.response["Error"]["Code"]
         if error_code == "ResourceNotFoundException":
@@ -52,6 +41,15 @@ def get_rsa_private_key_from_secrets(
                 "A client error occurred while retrieving the secret: {}".format(e)
             )
         raise
+    try:
+        # To parse multi-line text from a json formatted string, escape all `\n` with `\\n`
+        parsed_secret = json.loads(secret_string.replace("\n", "\\n"))
+    except json.JSONDecodeError:
+        raise ValueError("SecretString -- {} is not valid JSON.".format(secret_string))
+
+    logger.info("Fetching 'rsa_private_key' value from '{}'".format(secret_name))
+    rsa_private_key = parsed_secret.get("rsa_private_key")
+    return rsa_private_key
 
 
 # read in shared properties on module load - will fail hard if any are missing

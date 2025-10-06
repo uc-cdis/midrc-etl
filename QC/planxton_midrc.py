@@ -9,14 +9,18 @@ import pandas as pd
 import re
 import os
 import json
+import csv
 import sys
 import gen3
 import io
 import tempfile
 import requests
 import glob
+import copy
+from pathlib import Path
 import numpy as np
 from datetime import datetime
+from collections import Counter
 from io import StringIO
 from gen3.submission import Gen3Submission
 from gen3.auth import Gen3Auth
@@ -227,7 +231,7 @@ class planxton_midrc:
         """Sorts the TSVs provided by a MIDRC data submitter into manifests and node submission TSVs.
 
         Args:
-            batch(str): the name of the batch, e.g., "RSNA_20230303"
+            ppb(list): program, project, batch object used in planxton_midrc
             batch_dir(str): the full path of the local directory where the batch TSVs are located.
 
         Returns:
@@ -250,12 +254,13 @@ class planxton_midrc:
         nodes = [i[0] for i in nodes]
 
         node_tsvs = {}
+        series_tsvs = {}
+        split_tsvs = {}
         clinical_manifests, image_manifests = [], []
         other_tsvs, nomatch_tsvs = [], []
         node_regex = r".*/(\w+)_{}\.tsv".format(batch_name)
 
         for tsv in tsvs:
-            # print(tsv)
             if "manifest" in tsv:
                 if "clinical" in tsv:
                     clinical_manifests.append(tsv)
@@ -263,14 +268,16 @@ class planxton_midrc:
                     image_manifests.append(tsv)
             else:
                 match = re.findall(node_regex, tsv, re.M)
-                # print(match)
-
                 if not match:
                     nomatch_tsvs.append(tsv)
                 else:
                     node = match[0]
                     if node in nodes:
                         node_tsvs[node] = tsv
+                    if "_series" in node:
+                        series_tsvs[node] = tsv
+                    if "OPEN" in node or "SEQ" in node or "GC" in node:
+                        split_tsvs[node] = tsv
                     elif node + "_file" in nodes:
                         node_tsvs["{}_file".format(node)] = tsv
                     else:
@@ -278,6 +285,8 @@ class planxton_midrc:
         batch_tsvs = {
             "batch": batch_name,
             "node_tsvs": node_tsvs,
+            "series_tsvs": series_tsvs,
+            "split_tsvs": split_tsvs,
             "image_manifests": image_manifests,
             "clinical_manifests": clinical_manifests,
             "other_tsvs": other_tsvs,
@@ -639,6 +648,34 @@ class planxton_midrc:
         df = pd.DataFrame(json_case["data"])
         return df
 
+    def case_overlap_check(self, submitted_case_node, existing_case_node):
+        """
+        Compare all the case submitter_ids from the new batch against the existing submitter_ids for overlap.
+
+        Args:
+          submitted_case_node(df): The case node submitted with the current batch as a dataframe.
+          existing_case_node(df): The dataframe from "get_case_node".
+
+        Returns:
+          percernt_overlap(float): The percentage of submmitted submitter_ids present in existing
+          overlap_list: A list containing all duplicate submitter_ids.
+        """
+        # Extract the submitter_id column from both DataFrames (assuming the column is named 'submitter_id')
+        submitted_ids = set(submitted_case_node["submitter_id"])
+        existing_ids = set(existing_case_node["submitter_id"])
+
+        # Find the overlapping submitter_ids
+        overlap_list = list(submitted_ids & existing_ids)
+
+        # Calculate the percentage of overlap
+        percent_overlap = (
+            (len(overlap_list) / len(submitted_ids)) * 100
+            if len(submitted_ids) > 0
+            else 0.0
+        )
+
+        return percent_overlap, overlap_list
+
     def case_xcheck(self, submitted_case_node, existing_case_node):
         """
           Compare all the case_ids and some metadata from the new batch against the existing case_ids and metadata.
@@ -723,6 +760,34 @@ class planxton_midrc:
         df = pd.DataFrame(json_img_study["data"])
         return df
 
+    def img_study_overlap_check(self, submitted_img_study, existing_img_study):
+        """
+        Compare all the imaging_study submitter_ids from the new batch against the existing submitter_ids for overlap.
+
+        Args:
+          submitted_img_study(df): The case node submitted with the current batch as a dataframe.
+          existing_img_study(df): The dataframe from "get_img_study_node".
+
+        Returns:
+          percernt_overlap(float): The percentage of submmitted submitter_ids present in existing
+          overlap_list: A list containing all duplicate submitter_ids.
+        """
+        # Extract the submitter_id column from both DataFrames (assuming the column is named 'submitter_id')
+        submitted_ids = set(submitted_img_study["submitter_id"])
+        existing_ids = set(existing_img_study["submitter_id"])
+
+        # Find the overlapping submitter_ids
+        overlap_list = list(submitted_ids & existing_ids)
+
+        # Calculate the percentage of overlap
+        percent_overlap = (
+            (len(overlap_list) / len(submitted_ids)) * 100
+            if len(submitted_ids) > 0
+            else 0.0
+        )
+
+        return percent_overlap, overlap_list
+
     def img_study_xcheck(self, submitted_img_study, existing_img_study):
         """
         Compare all the imaging_study submitter_ids and some metadata from the new batch against the existing submitter_ids and metadata.
@@ -746,11 +811,11 @@ class planxton_midrc:
         for col in required_columns:
             if col not in submitted_img_study.columns:
                 raise ValueError(
-                    f"Column '{col}' is missing from the submitted case node dataframe."
+                    f"Column '{col}' is missing from the submitted image_study node dataframe."
                 )
             if col not in existing_img_study.columns:
                 raise ValueError(
-                    f"Column '{col}' is missing from the existing case node dataframe."
+                    f"Column '{col}' is missing from the existing image_study node dataframe."
                 )
 
         # Coerce all of the relevant columns into strings for comparison
@@ -758,7 +823,7 @@ class planxton_midrc:
             submitted_img_study[col] = submitted_img_study[col].astype(str)
             existing_img_study[col] = existing_img_study[col].astype(str)
 
-        # Merge the dataframes on case_id to align the cases
+        # Merge the dataframes on submitter_id to align the cases
         merged_df = submitted_img_study.merge(
             existing_img_study, on="submitter_id", suffixes=("_submitted", "_existing")
         )
@@ -939,60 +1004,105 @@ class planxton_midrc:
 
         batch_name = ppb[2] + "_" + ppb[3]
 
-        case_df = pd.read_csv(
-            batch_tsvs["node_tsvs"]["case"], sep="\t", header=0, dtype=str
-        )
+        if "case" in batch_tsvs:
+            case_df = pd.read_csv(
+                batch_tsvs["node_tsvs"]["case"], sep="\t", header=0, dtype=str
+            )
+            cids = list(set(case_df.submitter_id))
 
-        cids = list(set(case_df.submitter_id))
+            print("Found {} unique submitter_ids in the case TSV.".format(len(cids)))
+            report["len_case_ids"] = "Unique submitter_ids in case TSV: " + str(
+                len(cids)
+            )
 
-        print("Found {} unique submitter_ids in the case TSV.".format(len(cids)))
-        report["len_case_ids"] = "Unique submitter_ids in case TSV: " + str(len(cids))
+            for node in list(batch_tsvs["node_tsvs"]):
+                # read in the node TSV
+                print("\n{}".format(node))
+                report[node] = []  # initialize the node in the report dictionary
+                df = pd.read_csv(batch_tsvs["node_tsvs"][node], sep="\t", dtype=str)
 
-        for node in list(batch_tsvs["node_tsvs"]):
-            # read in the node TSV
-            print("\n{}".format(node))
-            report[node] = []  # initialize the node in the report dictionary
-            df = pd.read_csv(batch_tsvs["node_tsvs"][node], sep="\t", dtype=str)
+                # check case IDs
+                errors = self.check_case_ids(df, node, cids)
+                report[node] += errors
 
-            # check case IDs
-            errors = self.check_case_ids(df, node, cids)
-            report[node] += errors
+                # check that the 'type' column (node ID) is present and correct
+                errors = self.check_type_field(df, node)
+                report[node] += errors
 
-            # check that the 'type' column (node ID) is present and correct
-            errors = self.check_type_field(df, node)
-            report[node] += errors
+                # check for submitter_id column completeness and uniqueness
+                errors = self.check_submitter_id(df, node)
+                report[node] += errors
 
-            # check for submitter_id column completeness and uniqueness
-            errors = self.check_submitter_id(df, node)
-            report[node] += errors
+                # check for presence and completeness of link columns
+                errors = self.check_links(df, node, dd)
+                report[node] += errors
 
-            # check for presence and completeness of link columns
-            errors = self.check_links(df, node, dd)
-            report[node] += errors
+                # check for special characters in the TSV
+                errors = self.check_special_chars(node, batch_tsvs)
+                report[node] += errors
 
-            # check for special characters in the TSV
-            errors = self.check_special_chars(node, batch_tsvs)
-            report[node] += errors
+                # check for required property completeness
+                errors = self.check_required_props(df, node, dd, exclude_props)
+                report[node] += errors
 
-            # check for required property completeness
-            errors = self.check_required_props(df, node, dd, exclude_props)
-            report[node] += errors
+                # check for missing data in non-requred properties; check if TSV has columns with all null values
+                errors = self.check_completeness(df, node)
+                report[node] += errors
 
-            # check for missing data in non-requred properties; check if TSV has columns with all null values
-            errors = self.check_completeness(df, node)
-            report[node] += errors
+                # Check for correct property value types; i.e., number properties are numbers, strings are strings, etc.
+                errors = self.check_prop_types(df, node, dd, exclude_props)
+                report[node] += errors
 
-            # Check for correct property value types; i.e., number properties are numbers, strings are strings, etc.
-            errors = self.check_prop_types(df, node, dd, exclude_props)
-            report[node] += errors
+                if len(report[node]) == 0:
+                    msg = "No errors for '{}' TSV".format(node)
+                    report[node] = msg
 
-            if len(report[node]) == 0:
-                msg = "No errors for '{}' TSV".format(node)
-                report[node] = msg
+                file_name = "pre_ingest_qc_report_" + batch_name + ".txt"
 
-            file_name = "pre_ingest_qc_report_" + batch_name + ".txt"
+                report_out = report_output_dir + file_name
 
-            report_out = report_output_dir + file_name
+        else:
+            for node in list(batch_tsvs["node_tsvs"]):
+                # read in the node TSV
+                print("\n{}".format(node))
+                report[node] = []  # initialize the node in the report dictionary
+                df = pd.read_csv(batch_tsvs["node_tsvs"][node], sep="\t", dtype=str)
+
+                # check that the 'type' column (node ID) is present and correct
+                errors = self.check_type_field(df, node)
+                report[node] += errors
+
+                # check for submitter_id column completeness and uniqueness
+                errors = self.check_submitter_id(df, node)
+                report[node] += errors
+
+                # check for presence and completeness of link columns
+                errors = self.check_links(df, node, dd)
+                report[node] += errors
+
+                # check for special characters in the TSV
+                errors = self.check_special_chars(node, batch_tsvs)
+                report[node] += errors
+
+                # check for required property completeness
+                errors = self.check_required_props(df, node, dd, exclude_props)
+                report[node] += errors
+
+                # check for missing data in non-requred properties; check if TSV has columns with all null values
+                errors = self.check_completeness(df, node)
+                report[node] += errors
+
+                # Check for correct property value types; i.e., number properties are numbers, strings are strings, etc.
+                errors = self.check_prop_types(df, node, dd, exclude_props)
+                report[node] += errors
+
+                if len(report[node]) == 0:
+                    msg = "No errors for '{}' TSV".format(node)
+                    report[node] = msg
+
+                file_name = "pre_ingest_qc_report_" + batch_name + ".txt"
+
+                report_out = report_output_dir + file_name
 
         with open(report_out, "w") as file:
             json.dump(report, file)
@@ -1040,7 +1150,9 @@ class planxton_midrc:
             node_type = node_file_df["type"].iloc[0]
             print(f"Submitting a '{node_type}' type file to: {pid}.")
             try:
-                sub_obj = self.sub.submit_file(project_id=pid, filename=file)
+                sub_obj = self.sub.submit_file(
+                    project_id=pid, filename=file, chunk_size=250
+                )
                 return sub_obj
             except ValueError as ve:
                 raise ValueError(str(ve))
@@ -1079,9 +1191,10 @@ class planxton_midrc:
             record_type = json["type"]
             print(f"Submitting a {record_type} type record to: {ppb}.")
             try:
-                self.sub.submit_record(program=prog, project=proj, json=json)
+                sub_obj = self.sub.submit_record(program=prog, project=proj, json=json)
             except ValueError as ve:
                 raise ValueError(str(ve))
+        return sub_obj
 
     # Function for all submission to Sheepdog with Planxton
     def submit_to_graph(self, node_type, ppb, node):
@@ -1099,7 +1212,7 @@ class planxton_midrc:
         elif node_type == "project":
             sub_obj = self.submit_project(ppb=ppb, project_node=node)
         elif node_type == "file":
-            sub_obj = self.submit_file(ppb=ppb, file_path=node)
+            sub_obj = self.submit_file(ppb=ppb, file=node)
         elif node_type == "record":
             sub_obj = self.submit_record(ppb=ppb, json=node)
         else:
@@ -1316,9 +1429,11 @@ class planxton_midrc:
             df.rename(columns={"cases": "cases.submitter_id"}, inplace=True)
 
         df["cases.submitter_id"] = df["cases.submitter_id"].str.replace(
-            "Measurement_", ""
+            "Measurement_", "", case=False
         )
-        df["submitter_id"] = df["submitter_id"].str.replace("Measurement_", "")
+        df["submitter_id"] = df["submitter_id"].str.replace(
+            "Measurement_", "", case=False
+        )
         df["case_ids"] = df["cases.submitter_id"]
 
         if "test_method" in df:
@@ -1343,6 +1458,10 @@ class planxton_midrc:
         filename = tsvs["imaging_study"]
         df = pd.read_csv(filename, sep="\t", header=0, dtype=str)
 
+        batch_name = ppb[2] + "_" + ppb[3]
+
+        df["datasets.submitter_id"] = batch_name
+
         df["type"] = "imaging_study"
         df["age_at_imaging"] = pd.to_numeric(df["age_at_imaging"])
 
@@ -1354,8 +1473,12 @@ class planxton_midrc:
         if "cases" in df:
             df.rename(columns={"cases": "cases.submitter_id"}, inplace=True)
 
-        df["cases.submitter_id"] = df["cases.submitter_id"].str.replace("Case_", "")
-        df["case_ids"] = df["cases.submitter_id"]
+        if "case_ids" in df and "cases.submitter_id" not in df:
+            df["cases.submitter_id"] = df["case_ids"]
+
+        df["cases.submitter_id"] = df["cases.submitter_id"].str.replace(
+            "Case_", "", case=False
+        )
 
         if df["case_ids"].isna().any():
             raise ValueError("There are missing values in 'case_ids'.")
@@ -1363,6 +1486,9 @@ class planxton_midrc:
         df["study_year_shifted"] = df["study_year_shifted"].replace(
             {"Yes": True, "No": False}
         )
+
+        if "age_at_imaging" in df:
+            df["age_at_imaging"] = pd.to_numeric(df["age_at_imaging"], errors="coerce")
 
         if "study_covid_status" in df:
             df.drop(columns="study_covid_status", inplace=True)
@@ -1384,6 +1510,8 @@ class planxton_midrc:
             df.drop(columns="loinc_code", inplace=True)
         if "study_year" in df:
             df.drop(columns="study_year", inplace=True)
+        if "site_id" in df:
+            df.drop(columns="site_id", inplace=True)
 
         return df
 
@@ -1416,31 +1544,67 @@ class planxton_midrc:
         return df
 
     ########################################################################
+    ## Function for Creating a Procedure node
+    ########################################################################
+
+    def create_procedure_node(self, ppb, tsvs):
+        filename = tsvs["procedure"]
+        df = pd.read_csv(filename, sep="\t", header=0, dtype=str)
+
+        if "cases" in df:
+            df.rename(columns={"cases": "cases.submitter_id"}, inplace=True)
+        return df
+
+    ########################################################################
     ## Function for preparing the imaging_series_file TSVs using the indexd zip packages
     ########################################################################
 
-    def prep_img_ser_file(self, ppb, tsvs, index_dir):
+    def prep_indexed_img_ser_file(self, ppb, tsvs, index_dir, data_loc="both"):
+        """prepares imaging series files
+        Args:
+        ppb: The program/batch combination (str)
+        tsvs: The batch_tsvs['node_tsvs']
+        index_dir: Directory where the indexd files are located
+        data_loc: "both" prepares both open and sequestered data,
+                    "open" prepares only open data
+                    "seq" prepares only sequestered data
+
+        Returns:
+        i: The prepared series files
+        """
+
         batch_name = ppb[2] + "_" + ppb[3]
 
         open_file = "{}/indexed_packages_open_{}.tsv".format(index_dir, batch_name)
         seq_file = "{}/indexed_packages_seq_{}.tsv".format(index_dir, batch_name)
 
-        oi = pd.read_csv(open_file, sep="\t", header=0, dtype=str)
-        print(oi.shape)
-        si = pd.read_csv(seq_file, sep="\t", header=0, dtype=str)
-        print(si.shape)
+        if data_loc not in ["both", "open", "seq"]:
+            raise ValueError("data_loc must be either 'both', 'open', or 'seq'")
 
-        i = pd.concat([oi, si], ignore_index=True)
-        assert len(i) == (len(oi) + len(si))
+        if data_loc == "both":
+            oi = pd.read_csv(open_file, sep="\t", header=0, dtype=str)
+            print(oi.shape)
+            si = pd.read_csv(seq_file, sep="\t", header=0, dtype=str)
+            print(si.shape)
+            i = pd.concat([oi, si], ignore_index=True)
+            assert len(i) == (len(oi) + len(si))
+        elif data_loc == "open":
+            oi = pd.read_csv(open_file, sep="\t", header=0, dtype=str)
+            print(oi.shape)
+            i = oi
+        elif data_loc == "seq":
+            si = pd.read_csv(seq_file, sep="\t", header=0, dtype=str)
+            print(si.shape)
+            i = si
 
-        print(f"Example of the file_name column: {i['file_name'][0]}/n")
+        print(f"Example of the file_name column: {i['file_name'][0]}\n")
 
         i["case_ids"] = i["file_name"].str.extract("(.*)\/.*\/.*\.zip")
-        print(f"Example of the case_ids column: {i['case_ids'][0]}/n")
+        print(f"Example of the case_ids column: {i['case_ids'][0]}")
         i["study_uid"] = i["file_name"].str.extract(".*\/(.*)\/.*\.zip")
-        print(f"Example of the study_uid column: {i['study_uid'][0]}/n")
+        print(f"Example of the study_uid column: {i['study_uid'][0]}")
         i["series_uid"] = i["file_name"].str.extract(".*\/(.*)\.zip")
-        print(f"Example of the series_uid column: {i['series_uid'][0]}/n")
+        print(f"Example of the series_uid column: {i['series_uid'][0]}")
 
         if "guid" in i:
             i.rename(columns={"guid": "object_id"}, inplace=True)
@@ -1455,66 +1619,91 @@ class planxton_midrc:
     ## Function for preparing the imaging_series_file TSVs using the indexd zip packages
     ########################################################################
 
-    def create_series_tsv_dict(self, ppb, path):
+    def create_series_tsv_dict(self, ppb, data_path):
         """Given a directory path, all series files will be made into a dictionary
         Args:
-          path: Directory path that contains the series tsv files.  They must contain '*_series_{}_{}*'.format(org,batch) to be detected
+          data_path: Directory path that contains the series tsv files.  They must contain '*_series_{}_{}*'.format(org,batch) to be detected
         Return:
-          series_dict: A dictionary containing all series file paths and types from the give directory
+          series_tsvs: A dictionary containing all series file paths and types from the give directory
         """
         batch_name = ppb[2] + "_" + ppb[3]
 
         # Construct the pattern to search for files
-        path_pattern = os.path.join(path, "*_series_{}*".format(batch_name))
+        path_pattern = os.path.join(data_path, "*_series_{}*".format(batch_name))
+        series_files = glob.glob(path_pattern)
 
-        # Use glob to find all files that match the pattern in the specified directory
-        series_tsvs = glob.glob(path_pattern)
-
-        # Compile the regex pattern
+        # Compile regex patterns for both naming schemas
         series_regex = re.compile(r"(.*_series)_{}.*".format(batch_name))
+        series_file_regex = re.compile(r"(.*_series_file)_{}.*".format(batch_name))
 
-        # Create a dictionary with the last part of the file names as keys and the full paths as values
-        series_dict = {
-            os.path.basename(series_regex.match(i).group(1)): i
-            for i in series_tsvs
-            if series_regex.match(i)
+        # Count occurrences of each schema
+        schema_counts = Counter()
+        for file in series_files:
+            if series_file_regex.match(file):
+                schema_counts["series_file"] += 1
+            elif series_regex.match(file):
+                schema_counts["series"] += 1
+
+        # Determine the preferred schema
+        if schema_counts["series_file"] and not schema_counts["series"]:
+            preferred_regex = series_file_regex
+        elif schema_counts["series"] and not schema_counts["series_file"]:
+            preferred_regex = series_regex
+        else:
+            preferred_regex = None  # Both exist, so keep both
+
+        # Create dictionary based on the preferred schema
+        series_tsvs = {
+            os.path.basename(match.group(1)): file
+            for file in series_files
+            for match in [series_regex.match(file) or series_file_regex.match(file)]
+            if match and (preferred_regex is None or preferred_regex.match(file))
         }
 
-        return series_dict
+        return series_tsvs
 
-    def create_series_tsvs(self, ppb, path, series_dict):
+    def create_series_tsvs(self, ppb, path, series_tsvs, indexed_series_df):
         """
         Cleans and creates image series submission node files given a dictionary of original files
 
         Args:
           ppb (list): The ppb submission object for planxton_midrc
           path (str): The directory path to write the submission tsvs to
-          series_dict(dict): a dictionary of image series files to be cleaned
+          series_tsvs(dict): a dictionary of image series files to be cleaned
+          indexed_series_df(df): a dataframe of all the indexed files from the batch and the output of "prep_indexed_img_ser_file"
 
         Returns:
           Nothing, but it will save new tsv files for each that are either ready to submit or contain missing guids
         """
         batch_name = ppb[2] + "_" + ppb[3]
 
-        for node in series_dict:
-            print("\n\tProcessing {}: {}".format(node, series_dict[node]))
+        # Start a list of missing series uids
+        missing_series_uids = []
+
+        for node in series_tsvs:
+            print("\n\tProcessing {}: {}".format(node, series_tsvs[node]))
 
             df = pd.read_csv(series_tsvs[node], sep="\t", header=0, dtype=str)
 
             # Cleaning steps
             if "case_ids" in df:
-                df["case_ids"] = df.case_ids.str.replace("Case_", "")
-                display(df.case_ids[0])
+                df["case_ids"] = df.case_ids.str.replace("Case_", "", case=False)
+                display("case_ids example: ", df.case_ids[0])
             if "pixel_spacing" in df:
                 df["pixel_spacing"] = df.pixel_spacing.str.replace("\\", ",")
-                display(df.pixel_spacing[0])
+                display("Example of pixel spacing: ", df.pixel_spacing[0])
             if "imager_pixel_spacing" in df:
                 df["imager_pixel_spacing"] = df.pixel_spacing.str.replace("\\", ",")
-                display(df.imager_pixel_spacing[0])
+                display("Example of imager_pixel_spacing: ", df.imager_pixel_spacing[0])
             if "scanning_sequence" in df:
                 df["scanning_sequence"] = df.scanning_sequence.str.replace("\\", ",")
-                display(df.scanning_sequence[0])
+                display("Example of scanning_sequence: ", df.scanning_sequence[0])
             if "lossy_image_compression" in df:
+                # Replace NaN with a string representation
+                df["lossy_image_compression"] = df["lossy_image_compression"].fillna("")
+                df["lossy_image_compression"] = df["lossy_image_compression"].astype(
+                    str
+                )
                 df.loc[
                     df["lossy_image_compression"] == "0.0", "lossy_image_compression"
                 ] = "00"
@@ -1522,16 +1711,66 @@ class planxton_midrc:
                     df["lossy_image_compression"] == "0", "lossy_image_compression"
                 ] = "00"
                 df.loc[
+                    df["lossy_image_compression"] == 0, "lossy_image_compression"
+                ] = "00"
+                df.loc[
                     df["lossy_image_compression"] == "1.0", "lossy_image_compression"
                 ] = "01"
                 df.loc[
                     df["lossy_image_compression"] == "1", "lossy_image_compression"
                 ] = "01"
-                display(list(set(df.lossy_image_compression)))
+                df.loc[
+                    df["lossy_image_compression"] == 1, "lossy_image_compression"
+                ] = "01"
+                df["lossy_image_compression"] = df["lossy_image_compression"].astype(
+                    str
+                )
+                print(
+                    "Set of lossy_image_compression: ",
+                    list(set(df.lossy_image_compression)),
+                    "lossy_image_compression dtype before saving: ",
+                    df["lossy_image_compression"].dtype,
+                )
+            if "study_uid" in df and "imaging_studies.submitter_id" not in df:
+                df["imaging_studies.submitter_id"] = df.pop("study_uid")
+            if "region_spatial_format" in df:
+                region_spatial_format_mapping = {
+                    "0": "0000H: None or not applicable",
+                    "1": "0001H: 2D (tissue or flow)",
+                    "2": "0002H: M-Mode (tissue or flow)",
+                    "3": "0003H: Spectral (CW or PW Doppler)",
+                    "4": "0004H: Wave form (physiological traces, Doppler traces,...)",
+                    "5": "0005H: Graphics",
+                }
+
+                # Function to safely split and map values
+                def split_and_replace(val):
+                    # Handle non-string cases (like floats or NaN)
+                    if isinstance(val, float) or pd.isna(val):
+                        return val
+
+                    # Split if it's a string, else return the original
+                    val_list = str(val).split(",")
+
+                    # Replace values based on the mapping
+                    return [region_spatial_format_mapping.get(v, v) for v in val_list]
+
+                # Apply the function to the column
+                df["region_spatial_format"] = df["region_spatial_format"].apply(
+                    split_and_replace
+                )
+                print("Set of region_spatial_format", df["region_spatial_format"])
+
             if "series_description" in df:
                 df["series_description"] = df["series_description"].str.replace(
                     "²", "^2"
                 )
+
+            if "image_data_modification_name" in df:
+                df["image_data_modification_name"] = df[
+                    "image_data_modification_name"
+                ].fillna("")
+                df["image_data_modification_name"] = pd.Series([], dtype=object)
 
             # creating new columns
             df["type"] = "{}_file".format(node)
@@ -1540,8 +1779,18 @@ class planxton_midrc:
             df["data_type"] = "DICOM"
             if "modality" in df:
                 df["data_category"] = df["modality"]
-            display(list(set(df.data_category)))
+            if "object_id" in df.columns:
+                if df["object_id"].isna().all() or (df["object_id"] == "").all():
+                    df = df.drop(columns=["object_id"])
+            display("Set of data_category: ", list(set(df.data_category)))
             df["core_metadata_collections.submitter_id"] = batch_name
+            df["submitter_id"] = df["series_uid"]
+            if "imaging_studies" in df:
+                df.rename(
+                    columns={"imaging_studies": "imaging_studies.submitter_id"},
+                    inplace=True,
+                )
+                display(df["imaging_studies.submitter_id"].iloc[0])
 
             # special case cleaning
             if node == "ct_series":
@@ -1577,12 +1826,335 @@ class planxton_midrc:
                     columns={"mr_exams.submitter_id": "imaging_studies.submitter_id"},
                     inplace=True,
                 )
-            display(df["imaging_studies.submitter_id"][0])
 
             # checks
             series_uids = list(set(df.series_uid))
             print(
                 "\t\tThe {} TSV contains {} records and {} unique series UIDs.".format(
-                    node, len(df), len(series_uids)
+                    node, len(df), len(set(series_uids))
                 )
             )
+
+            # create a temp_df that contains file metadata from indexed_series_df
+            temp_df = pd.merge(
+                df,
+                indexed_series_df[
+                    ["object_id", "md5sum", "file_size", "file_name", "series_uid"]
+                ],
+                on="series_uid",
+                how="left",
+            )
+            if "lossy_image_compression" in temp_df:
+                # Replace NaN with a string representation
+                temp_df["lossy_image_compression"] = temp_df[
+                    "lossy_image_compression"
+                ].fillna("")
+
+                # Force everything to be a string
+                temp_df["lossy_image_compression"] = temp_df[
+                    "lossy_image_compression"
+                ].astype(str)
+            missing = temp_df.loc[temp_df["object_id"].isna()]
+            ready = temp_df.loc[~temp_df["object_id"].isna()]
+            ready_name = "{}_file_{}.tsv".format(node, batch_name)
+            ready.to_csv(
+                os.path.join(path, ready_name),
+                sep="\t",
+                index=False,
+                quoting=csv.QUOTE_NONNUMERIC,
+            )
+            if len(missing) > 0:
+                print(
+                    "THERE ARE MISSING GUIDS in {}_file_{}.tsv".format(node, batch_name)
+                )
+                missing_name = "MISSING_GUID_{}_file_{}.tsv".format(node, batch_name)
+                missing.to_csv(missing_name, sep="\t", index=False)
+            print(
+                "\t\tThere are {} records with matching series file GUID in indexd.".format(
+                    len(ready)
+                )
+            )
+            print(
+                "\t\tThere are {} records MISSING a series file GUID in indexd.".format(
+                    len(missing)
+                )
+            )
+            # save the series records with no index metadata in "i"
+            missing_series_uids = missing_series_uids + list(set(missing["series_uid"]))
+
+    def split_tsvs(
+        self, ppb, out_split_path, seq_file, grand_chall_file, submission_nodes_path
+    ):
+        """
+        Splits tsvs into "Open" and "Seq" categories given a dictionary of node_tsvs and the master sequestration file
+
+        Args:
+          ppb (list): The ppb submission object for the staging environment of planxton_midrc
+          out_split_path (str): The directory path to write the submission tsvs to
+          seq_file (path): The directory path to the master sequestration file
+          grand_chall_file (path): The directory path to the grand challange data file
+          submission_nodes_path(path): The directory path to the submission ready files that will be split
+
+        Returns:
+          split_tsv_dict (dict): A dictionary with keys as 'tname' and values as a list of paths to split TSV files.
+        """
+
+        split_tsv_dict = {"seq": {}, "open": {}, "gc": {}, "missing": {}}
+
+        batch_name = ppb[2] + "_" + ppb[3]
+
+        seq_df = pd.read_csv(seq_file, sep="\t", header=0, dtype=str)
+        gc_df = pd.read_csv(grand_chall_file, sep="\t", header=0, dtype=str)
+        print("Sequestration_df shape: ", seq_df.shape)
+        print("Grand Challange shape: ", gc_df.shape)
+
+        seq_df.loc[seq_df["case_ids"].isin(gc_df["case_ids"]), "dataset"] = "GC"
+
+        cids = seq_df.set_index("case_ids").to_dict()["dataset"]
+        open_ids = {i for i in cids if cids[i] == "Open"}
+        seq_ids = {i for i in cids if cids[i] == "Seq"}
+        gc_ids = {i for i in cids if cids[i] == "GC"}
+        ignore_ids = {i for i in cids if cids[i] == "Ignore"}
+        assert len(seq_ids) + len(open_ids) + len(gc_ids) + len(ignore_ids) == len(cids)
+
+        initial = ppb[2][0]  # grabbing just the first character of the organization
+        seq_pid = f"SEQ_Open-{initial}3"
+        open_pid = f"Open-{initial}1"
+        gc_pid = f"GC-{initial}2"
+
+        batch_tsvs = self.sort_batch_tsvs(ppb, submission_nodes_path)
+        tsvs = batch_tsvs["node_tsvs"]
+
+        for tname in tsvs:
+            print(f"\n\tProcessing {batch_name}_{tname}: {tsvs[tname]}")
+            df = pd.read_csv(tsvs[tname], sep="\t", header=0, dtype=str)
+            if "case_ids" in list(df) or tname == "case":
+                if tname == "case":
+                    sdf = copy.deepcopy(df[df["submitter_id"].isin(seq_ids)])
+                    odf = copy.deepcopy(df[df["submitter_id"].isin(open_ids)])
+                    gdf = copy.deepcopy(df[df["submitter_id"].isin(gc_ids)])
+                    sdf["datasets.submitter_id"] = f"{batch_name}"
+                    odf["datasets.submitter_id"] = f"{batch_name}"
+                    gdf["datasets.submitter_id"] = f"{batch_name}"
+                else:
+                    sdf = copy.deepcopy(df[df["case_ids"].isin(seq_ids)])
+                    odf = copy.deepcopy(df[df["case_ids"].isin(open_ids)])
+                    gdf = copy.deepcopy(df[df["case_ids"].isin(gc_ids)])
+
+                sdf["project_id"] = seq_pid
+                odf["project_id"] = open_pid
+                gdf["project_id"] = gc_pid
+
+                seq_name = f"SEQ_{tname}_{batch_name}.tsv"
+                open_name = f"OPEN_{tname}_{batch_name}.tsv"
+                gc_name = f"GC_{tname}_{batch_name}.tsv"
+
+                if len(sdf) > 0:
+                    seq_path = os.path.join(out_split_path, seq_name)
+                    sdf.to_csv(seq_path, sep="\t", index=False)
+                    split_tsv_dict["seq"][tname] = seq_path
+                else:
+                    print(f"\n\t\tNo sequestered cases in '{tname}'")
+
+                if len(odf) > 0:
+                    open_path = os.path.join(out_split_path, open_name)
+                    odf.to_csv(open_path, sep="\t", index=False)
+                    split_tsv_dict["open"][tname] = open_path
+                else:
+                    print(f"\n\t\tNo open cases in '{tname}'")
+
+                if len(gdf) > 0:
+                    gc_path = os.path.join(out_split_path, gc_name)
+                    gdf.to_csv(gc_path, sep="\t", index=False)
+                    split_tsv_dict["gc"][tname] = gc_path
+                else:
+                    print(f"\n\t\tNo grand challenge cases in '{tname}'")
+
+                if (len(odf) + len(sdf) + len(gdf)) != len(df):
+                    d = pd.merge(seq_df, df, on="case_ids", how="right")
+                    missing = d.loc[d["dataset"].isna()]
+                    print(
+                        f"\n\t\t{len(missing)} records for {len(list(set(missing.case_ids)))} cases missing from sequestration list in '{tname}'"
+                    )
+                    missing_path = os.path.join(out_split_path, f"MISSING_{tname}.tsv")
+                    missing.to_csv(missing_path, sep="\t", index=False)
+                    split_tsv_dict["missing"][tname] = missing_path
+
+                else:
+                    print((len(odf) + len(sdf) + len(gdf)) != len(df))
+            else:
+                print(f"\n\t\tFound no case_ids in {tsvs[tname]}!!")
+
+        return split_tsv_dict
+
+    def create_ordered_split_tsvs(self, ppb, split_tsv_dict):
+        """
+        Transforms a split_tsv_dict into an ordered_split_tsv utilizing the 'get_dd_node_order' function.
+
+        Args:
+            ppb (list): The ppb submission object for the staging environment of planxton_midrc
+            split_tsv_dict (dict): The output of the split_tsvs function and an unordered dictionary of the split tsvs for submission
+
+        Return:
+            ordered_split_tsvs (dict): An ordered split_tsv dictionary that can be used to submit directly to sheepdog
+        """
+
+        node_order = self.get_dd_node_order()
+
+        ordered_split_tsvs = {"seq": {}, "open": {}, "gc": {}, "missing": {}}
+
+        for commons in split_tsv_dict:
+            for ordered_node in node_order:
+                if ordered_node in split_tsv_dict[commons].keys():
+                    ordered_split_tsvs[commons][ordered_node] = split_tsv_dict[commons][
+                        ordered_node
+                    ]
+
+        return ordered_split_tsvs
+
+    def multi_node_submit_to_graph(self, ppb, ordered_split_tsvs, ignored_nodes=None):
+        """
+        Submits all nodes in an ordered_split_tsvs dictionary for the instance specified.
+
+        Args:
+            ppb (list): The ppb submission object for the staging environment of planxton_midrc
+            ordered_split_tsvs (dict): An ordered split_tsv dictionary, the output of 'create_ordered_split_tsvs'
+            ignored_nodes (list): A list of nodes that should not be submitted (default: None)
+
+        Returns:
+            sub_obj_dict (dict): A dictionary of submission objects
+        """
+        if ignored_nodes is None:
+            ignored_nodes = []
+
+        sub_obj_dict = {}
+
+        if not ppb or len(ppb) < 1:
+            raise ValueError(
+                "Invalid 'ppb' argument. Ensure it contains at least one element."
+            )
+
+        # Determine  commons type
+        if ppb[0] == "Open":
+            commons = "open"
+        elif ppb[0] == "SEQ_Open":
+            commons = "seq"
+        else:
+            raise ValueError(
+                f"Unrecognized ppb value '{ppb[0]}' for commons selection."
+            )
+
+        # Extract pid
+        pid = self.extract_pid(ppb)
+
+        # submit nodes not in ignore_nodes
+        for node, filename in ordered_split_tsvs[commons].items():
+            if node in ignored_nodes:
+                print(f"Ignored node '{node}'.")
+                continue
+
+            try:
+                print(
+                    f"Submitting node '{node}' with project_id='{pid}' and filename='{filename}'"
+                )
+                sub_obj = self.submit_to_graph(node_type="file", ppb=ppb, node=filename)
+                sub_obj_dict[node] = sub_obj
+            except Exception as e:
+                print(f"Error submitting node '{node}': {e}")
+                print(
+                    f"Details for node '{node}': filename='{filename}', project_id='{pid}'"
+                )
+
+        return sub_obj_dict
+
+    def data_release_stats(self, ppb, data_dir, submit_dir, split_dir, out_dir):
+        """
+        Produces a file that contains all relevant statistics for release of a batch.
+
+        Args:
+            ppb (list): The ppb submission object for the staging environment of planxton_midrc
+            data_dir (path): The directory containing the original files from the S3 buckets batch location
+            submit_dir (path): The directory containing files that have been manipulated but not split yet
+            split_dir (path): The directory containing the split files produced during sheepdog ingestion
+            out_dir (path): The directory that the statistical results file should be written to
+
+        Returns:
+            batch_stats (file): A text file containing all relevant statistics for the batch
+        """
+
+        # get all original, submission and split tsvs from their respective directory
+        orig_tsvs = self.sort_batch_tsvs(ppb, data_dir)
+
+        # get all tsvs after they are transformed but before they are split
+        submit_tsvs = self.sort_batch_tsvs(ppb, submit_dir)
+
+        # get the paths for each of the split nodes
+        split_tsvs = self.sort_batch_tsvs(ppb, split_dir)
+
+        # Original data summary
+        orig_dict = {}
+
+        # counts of each of the original data
+        for node_file, node_path in orig_tsvs["node_tsvs"].items():
+            df = pd.read_csv(node_path, sep="\t")
+            orig_dict[node_file + "_counts"] = df.shape[0]
+
+        # Sequestered data summary
+        open_dict = {}
+        seq_dict = {}
+        missing_dict = {}
+
+        # counts for each of the Open datasets
+        for node_file, node_path in split_tsvs["split_tsvs"].items():
+            if "OPEN" in node_file:
+                df = pd.read_csv(node_path, sep="\t")
+                open_dict[node_file + "_counts"] = df.shape[0]
+            elif "SEQ" in node_file:
+                df = pd.read_csv(node_path, sep="\t")
+                seq_dict[node_file + "_counts"] = df.shape[0]
+            elif "MISSING" in node_file:
+                df = pd.read_csv(node_path, sep="\t")
+                missing_dict[node_file + "_counts"] = df.shape[0]
+
+        # File sizes for submission data (before split)
+        orig_file_sizes = {}
+
+        for node_file, node_path in submit_tsvs["node_tsvs"].items():
+            df = pd.read_csv(node_path, sep="\t")
+            if "file" in str(node_file).lower() and "file_size" in df.columns:
+                orig_file_sizes[node_file] = df["file_size"].sum()  # in bytes
+
+        # File sizes for split data
+        split_file_sizes = {"open": {}, "seq": {}, "missing": {}}
+
+        for node_file, node_path in split_tsvs["split_tsvs"].items():
+            df = pd.read_csv(node_path, sep="\t")
+            if "file" in str(node_file).lower() and "file_size" in df.columns:
+                if "OPEN" in node_file:
+                    split_file_sizes["open"][node_file + "_file_size"] = df[
+                        "file_size"
+                    ].sum()  # in bytes
+                if "SEQ" in node_file:
+                    split_file_sizes["seq"][node_file + "_file_size"] = df[
+                        "file_size"
+                    ].sum()  # in bytes
+                if "MISSING" in node_file:
+                    split_file_sizes["missing"][node_file + "_file_size"] = df[
+                        "file_size"
+                    ].sum()  # in bytes
+
+        master_dict = {
+            "original": orig_dict,
+            "OPEN": open_dict,
+            "SEQ": seq_dict,
+            "original_file_size": orig_file_sizes,
+            "split_file_sizes": split_file_sizes,
+        }
+
+        return master_dict
+
+        print(orig_dict)
+        print(open_dict)
+        print(seq_dict)
+        print(orig_file_sizes)
+        print(split_file_sizes)

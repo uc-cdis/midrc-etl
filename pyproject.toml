@@ -18,10 +18,10 @@ pandas = "^1.4.2"
 urllib3 = "1.26.9"
 gen3 = "^4.11.4"
 jsonobject = "^2.0.0"
-pyarrow = "^8.0.0"
+pyarrow = "^14.0.1"
 
 [tool.poetry.group.dev.dependencies]
-black = "^22.1.0"
+black = "^24.3.0"
 pycodestyle = "^2.8.0"
 pylint = "^2.12.2"
 
